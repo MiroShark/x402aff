@@ -16,10 +16,10 @@ Two addresses come back, and they are NOT the same thing:
   - payout_address — where rewards for the code should be sent  ← pay THIS one
 
 IMPORTANT: for the free auto-generated `bc_*` codes, base.dev holds the NFT
-custodially, so `owner` is the base.dev REGISTRAR (one wallet holds ~46k codes),
-NOT the builder. Only self-custodied / vanity codes have owner == the builder.
-Either way, `payout_address` is the meaningful recipient — always pay that.
-Verified live: bc_c12702g2 → owner 0x1bD9…C7F1 (registrar), payout 0x95dD…71cc.
+custodially, so `owner` is the base.dev REGISTRAR (one wallet holds tens of
+thousands of codes), NOT the builder. Only self-custodied / vanity codes have
+owner == the builder. Either way, `payout_address` is the meaningful recipient —
+always pay that.
 
 This module speaks raw JSON-RPC `eth_call` (only needs `requests`), so it drops
 into the affiliation kit with no web3 dependency. Point it at any Base RPC.

@@ -1,9 +1,8 @@
 """Resource-server side: declare your app code + capture referer codes.
 
 A minimal, self-contained Flask app that shows the THREE server-side touch points
-of the affiliation system. It's illustrative (trimmed from MiroShark's real
-`app/__init__.py` + `app/api/x402_run.py` + `app/utils/settle_capture.py`) — wire
-the same three pieces into your own x402 route:
+of the affiliation system. It's illustrative — wire the same three pieces into
+your own x402 route:
 
   1. DECLARE  — attach your app code ("a") to the paid route's extensions, once
                 at startup. That's the whole "declare it" step.
@@ -195,7 +194,7 @@ def create_app() -> Flask:
             app.logger.warning("X402_BUILDER_CODE invalid (%s); attribution off", exc)
 
     # Then install the x402 middleware with these extensions on the route. Sketch
-    # (real imports depend on your x402 SDK version — see MiroShark app/__init__.py):
+    # (real imports depend on your x402 SDK version):
     #
     #   from x402.http.middleware.flask import payment_middleware
     #   from x402.http.types import PaymentOption, RouteConfig

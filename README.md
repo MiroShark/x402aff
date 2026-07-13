@@ -1,17 +1,17 @@
 # x402 Builder-Code Affiliation Kit
 
-A small, self-contained extraction of how [MiroShark-x402](https://github.com/aaronjmars/MiroShark-x402)
-**declares a Base Builder Code** and **tracks affiliation** so the apps/agents
-that drive payments to your x402 API get paid a share.
+A small, self-contained, dependency-light kit for **declaring a Base Builder
+Code** on an x402 API and **tracking affiliation** so the apps/agents that drive
+payments to your API get paid a share.
 
 If you sell an API behind an x402 paywall, this is the whole machinery for:
 "when someone's app pays me on behalf of their user, record *whose* app it was,
 and pay that builder a cut."
 
-> Distilled and simplified for teaching. `builder_code.py` is the real, faithful
-> module (fully tested); the server / tracking / backfill files are trimmed,
-> dependency-light versions of MiroShark's production code so the whole loop runs
-> locally in one second.
+> Framework-agnostic core (`builder_code.py`, `resolver.py`) plus minimal,
+> runnable reference implementations for the server, tracking, and backfill —
+> the whole loop runs locally in about a second. Wire the same pieces into your
+> own stack.
 
 ---
 
@@ -45,13 +45,13 @@ request can carry up to three codes (each `^[a-z0-9_]{1,32}$`):
 
 ## The money
 
-- The buyer's `$1.00` **settles in full, on-chain, to your `payTo`** at request
+- The buyer's payment **settles in full, on-chain, to your `payTo`** at request
   time. Attribution changes nothing about that transfer.
 - The **revenue share is paid off-chain**, out of band, to the payout wallet the
-  builder registered for their code. MiroShark pays **50% of net profit**
-  (`net = price − your actual cost`, floored at $0, completed runs only) to a
-  buyer's `s` code. A first-party website referral (`?ref=`) gets 25%. Pick your
-  own split — `compute_payouts(share=...)`.
+  builder registered for their code. A common split is **a share of net profit**
+  (`net = price − your actual cost`, floored at $0, completed requests only) to a
+  buyer's `s` code — pick your own with `compute_payouts(share=...)` (defaults to
+  0.50).
 - It **stacks** with Base's own builder-rewards program on the volume driven.
 
 Because you track exact per-request cost, each builder's share is computed
@@ -266,11 +266,8 @@ client.register_extension(BuilderCodeClientExtension("bc_yourcode"))
   actually sending the USDC share is a separate job you run against
   `compute_payouts()`.
 
-## Provenance
+## References
 
-Extracted from MiroShark-x402:
-[`app/utils/builder_code.py`](https://github.com/aaronjmars/MiroShark-x402/blob/main/app/utils/builder_code.py),
-[`app/api/x402_run.py`](https://github.com/aaronjmars/MiroShark-x402/blob/main/app/api/x402_run.py),
-[`app/utils/settle_capture.py`](https://github.com/aaronjmars/MiroShark-x402/blob/main/app/utils/settle_capture.py),
-[`scripts/backfill_builder_codes.py`](https://github.com/aaronjmars/MiroShark-x402/blob/main/scripts/backfill_builder_codes.py).
-Spec: [ERC-8021 builder_code.md](https://github.com/x402-foundation/x402/blob/main/specs/extensions/builder_code.md).
+- [ERC-8021 builder-code extension spec](https://github.com/x402-foundation/x402/blob/main/specs/extensions/builder_code.md)
+- [CDP Builder Codes](https://docs.cdp.coinbase.com/x402/core-concepts/builder-codes) · [CDP SQL API](https://docs.cdp.coinbase.com/data/sql-api/schema)
+- [Base Builder Codes](https://docs.base.org/apps/builder-codes/builder-codes) · registry [`github.com/base/builder-codes`](https://github.com/base/builder-codes)

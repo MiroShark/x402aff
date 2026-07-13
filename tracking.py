@@ -1,9 +1,9 @@
 """Minimal affiliation tracking store — one row per paid request.
 
-A dependency-light distillation of what MiroShark stores on its `runs` table,
-stripped down to just the affiliation columns and backed by plain SQLite so this
-kit runs anywhere. In production you'd fold these columns into whatever row you
-already write per paid request (a run, an order, a job) instead of a new table.
+A dependency-light store holding just the affiliation columns, backed by plain
+SQLite so this kit runs anywhere. In production you'd fold these columns into
+whatever row you already write per paid request (a run, an order, a job) instead
+of a new table.
 
 The lifecycle of one paid request, in columns:
 
@@ -153,10 +153,10 @@ def compute_payouts(conn: sqlite3.Connection, *, share: float = 0.50) -> list[Pa
     """Roll completed payments up into $ owed per referer builder code (``s``).
 
     net_profit_per_run = max(0, price_usd − cost_usd); owed = net_profit * share.
-    Default ``share`` is 0.50 — MiroShark pays buyer builder codes 50% of net
-    profit (a referred website affiliate gets 25%; pick per your program). The
-    price itself already settled in full on-chain to your payTo — this share is
-    paid OUT-of-band to the wallet the builder registered for their code.
+    Default ``share`` is 0.50 (a common revenue split for a buyer builder code) —
+    pick whatever your program uses. The price itself already settled in full
+    on-chain to your payTo; this share is paid OUT-of-band to the wallet the
+    builder registered for their code.
 
     A row's ``s`` may be comma-joined (layered clients); each code is credited.
     """

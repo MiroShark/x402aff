@@ -1,4 +1,4 @@
-"""Tests for the declare + decode helpers (ported from MiroShark's suite).
+"""Tests for the declare + decode helpers.
 
 Run:  pip install cbor2 pytest && pytest test_builder_code.py
 
@@ -42,7 +42,7 @@ def test_rejects_malformed_codes(bad):
 # --- normalizers: sanitize codes read off the wire ----------------------------
 
 def test_normalize_builder_code_accepts_and_trims():
-    assert normalize_builder_code("  bc_c12702g2  ") == "bc_c12702g2"
+    assert normalize_builder_code("  bc_abc12345  ") == "bc_abc12345"
 
 
 @pytest.mark.parametrize("bad", ["", "BC_UPPER", "bc-dash", "x" * 33, None, 123, ["bc_x"]])
@@ -55,7 +55,7 @@ def test_normalize_service_codes_list_joins_valid():
 
 
 def test_normalize_service_codes_accepts_bare_string():
-    assert normalize_service_codes("bc_c12702g2") == "bc_c12702g2"
+    assert normalize_service_codes("bc_abc12345") == "bc_abc12345"
 
 
 def test_normalize_service_codes_dedupes_and_drops_invalid():
