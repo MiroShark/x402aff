@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# Local SQLite store created by tracking.py / demo.py
+affiliation.db
+*.db
+
+# Env / secrets (never commit CDP keys or JWTs)
+.env
+.env.*
