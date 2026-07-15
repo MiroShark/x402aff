@@ -12,7 +12,13 @@ The lifecycle of one paid request, in columns:
     when finished ──▶  set_result(id, cost, ok) # so we can compute net profit
     daily cron    ──▶  set_builder_codes(...)   # w, and any a/s missed on-chain
 
-Then compute_payouts() rolls it up into $ owed per referer builder code.
+Two payout paths, pick one per route (see INTEGRATION.md):
+
+  * OFF-CHAIN ledger — ``compute_payouts()`` rolls completed runs up into $ owed
+    per referer code; you pay it out yourself, later. Trust-based.
+  * ON-CHAIN split — ``settler.py`` carves the builder's cut at settlement.
+    ``set_split()`` records what already settled on-chain (tx, split address,
+    builder payout, cut) — the ledger becomes reconciliation, not an IOU.
 """
 from __future__ import annotations
 
@@ -41,7 +47,13 @@ def connect(db_path: str = DB_PATH) -> sqlite3.Connection:
             settle_tx_hash TEXT,           -- filled by the settle observer
             price_usd      REAL NOT NULL,  -- what the buyer paid ($1.00)
             cost_usd       REAL,           -- your actual cost to serve it
-            status         TEXT NOT NULL   -- queued | completed | failed | ...
+            status         TEXT NOT NULL,  -- queued | completed | failed | ...
+            -- ON-CHAIN split path (settler.py) — recorded when the cut was
+            -- carved at settlement, so the ledger is reconciliation not an IOU:
+            split_tx_hash    TEXT,         -- the deploy+fund+distribute tx
+            split_address    TEXT,         -- per-(seller,builder) PushSplit
+            builder_payout   TEXT,         -- resolved wallet the cut was sent to
+            builder_cut_usd  REAL          -- amount pushed to the builder
         )
         """
     )
@@ -91,6 +103,30 @@ def set_settle_tx(conn: sqlite3.Connection, payment_id: str, tx_hash: str) -> No
         "UPDATE payments SET settle_tx_hash = ? "
         "WHERE id = ? AND settle_tx_hash IS NULL",
         (tx_hash[:80], payment_id),
+    )
+    conn.commit()
+
+
+def set_split(
+    conn: sqlite3.Connection,
+    payment_id: str,
+    *,
+    split_tx_hash: str,
+    split_address: Optional[str],
+    builder_payout: Optional[str],
+    builder_cut_usd: Optional[float],
+) -> None:
+    """Record an ENFORCED split that already settled on-chain (from settler.py).
+
+    Unlike ``compute_payouts`` (which computes what you *owe*), this records what
+    was *already paid*: the settlement carved the builder's cut in the same tx, so
+    this row is a reconciliation receipt, not an IOU. ``split_address`` /
+    ``builder_payout`` are NULL when there was no builder leg (unresolved ``s`` →
+    100% to seller)."""
+    conn.execute(
+        "UPDATE payments SET split_tx_hash = ?, split_address = ?, "
+        "builder_payout = ?, builder_cut_usd = ? WHERE id = ?",
+        (split_tx_hash[:80], split_address, builder_payout, builder_cut_usd, payment_id),
     )
     conn.commit()
 
@@ -151,6 +187,11 @@ class Payout:
 
 def compute_payouts(conn: sqlite3.Connection, *, share: float = 0.50) -> list[Payout]:
     """Roll completed payments up into $ owed per referer builder code (``s``).
+
+    This is the OFF-CHAIN path: you pay these out yourself, later. If you use the
+    on-chain settler (settler.py) instead, the cut was already carved at
+    settlement — reconcile against ``builder_cut_usd`` rather than owing anything.
+
 
     net_profit_per_run = max(0, price_usd − cost_usd); owed = net_profit * share.
     Default ``share`` is 0.50 (a common revenue split for a buyer builder code) —

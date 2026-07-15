@@ -11,11 +11,14 @@ from __future__ import annotations
 
 import cbor2
 
+import split
 import tracking
 from builder_code import ERC_8021_MARKER, declare_builder_code, parse_builder_code_suffix
 
 APP_CODE = "bc_yourcode"       # yours (the resource server)
 FACIL_CODE = "cdp_facil1"      # the CDP facilitator's wallet code
+SELLER_PAYOUT = "0xSeller00000000000000000000000000000000"  # where your share goes
+ALICE_PAYOUT = "0xBuilderAlice000000000000000000000000000"  # bc_alice's registered wallet
 
 
 def fake_settlement_calldata(*, a=None, w=None, s=None) -> str:
@@ -59,12 +62,32 @@ def main() -> None:
         tracking.set_builder_codes(conn, row["id"], w=parsed.get("w"))
     print("recovered facilitator code w =", FACIL_CODE, "on all settled runs\n")
 
-    # 6. PAYOUTS — roll completed runs up into $ owed per referer (50% of net).
-    print("payouts (50% of net profit = $1.00 − your cost):")
+    # 6a. OFF-CHAIN path — roll completed runs up into $ owed per referer.
+    print("OFF-CHAIN payouts (50% of net profit = $1.00 − your cost, paid later):")
     for p in tracking.compute_payouts(conn, share=0.50):
         print(f"  {p.builder_code}: {p.completed_runs} runs, "
               f"net ${p.net_profit_usd:.2f} → owed ${p.owed_usd:.2f}")
     # bc_alice: 2 runs, net (0.80 + 0.45) = $1.25 → owed $0.625
+
+    # 6b. ON-CHAIN path — the settler carves a flat 10% at settlement instead.
+    # Here the builder payout is stubbed (offline); live, split.resolve_and_plan
+    # reads it from the Base registry. See settler.py.
+    print("\nON-CHAIN split (settler.py: flat 10% carved at settlement):")
+    for pid, referer, _cost, _status in runs:
+        payout = ALICE_PAYOUT if referer == "bc_alice" else None
+        plan = split.build_split_plan(SELLER_PAYOUT, payout, builder_code=referer)
+        amounts = plan.amounts(1.00)
+        if plan.has_builder:
+            tracking.set_split(
+                conn, pid, split_tx_hash="0x" + "22" * 32,
+                split_address="0xSplitAliceSeller00000000000000000000000",
+                builder_payout=plan.builder_payout,
+                builder_cut_usd=amounts[plan.builder_payout],
+            )
+            print(f"  {pid} ({referer}): ${amounts[plan.builder_payout]:.2f} → builder, "
+                  f"${amounts[SELLER_PAYOUT]:.2f} → seller")
+        else:
+            print(f"  {pid} (no referer): $1.00 → seller (no split)")
 
 
 if __name__ == "__main__":
