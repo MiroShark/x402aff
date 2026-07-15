@@ -57,6 +57,12 @@ request can carry up to three codes (each `^[a-z0-9_]{1,32}$`):
 Because you track exact per-request cost, each builder's share is computed
 precisely from `(recorded s code, price, cost)`.
 
+**Or enforce it on-chain.** Instead of paying out later, a **settler** can carve a
+flat cut (e.g. 10% of price) *at settlement* — **automatic, atomic, auditable** —
+by splitting each payment through an audited 0xSplits PushSplit. See `split.py`,
+`settler.py`, and `INTEGRATION.md` (incl. the honest trust level: you run the
+settler, so it's enforced-by-default but not cryptographically trustless).
+
 ---
 
 ## Run it
@@ -64,8 +70,9 @@ precisely from `(recorded s code, price, cost)`.
 ```bash
 pip install cbor2 requests flask pytest   # cbor2 is the only hard dep of the core
 pip install cdp-sdk                        # optional: only for the CDP SQL API path
-python demo.py                            # the whole loop, no network, ~1s
-pytest test_builder_code.py -q            # 32 tests on declare + on-chain decode
+python demo.py                            # the whole loop (off-chain + on-chain split), no network, ~1s
+python settler.py                         # print the atomic settle multicall for one payment
+pytest -q                                 # 44 tests (declare/decode + split math)
 ```
 
 | File | What it is |
@@ -78,6 +85,8 @@ pytest test_builder_code.py -q            # 32 tests on declare + on-chain decod
 | **`cdp_sql.py`** | Thin client for CDP's SQL API (`POST /v2/data/query/run`, Bearer JWT). |
 | **`queries.sql`** | Copy-paste attribution queries you can run **right now** in the no-auth SQL Playground. |
 | **`resolver.py`** | **Code → wallet.** Resolve any builder code to its **owner** and **payout address** via the Base ERC-721 registry (raw `eth_call`, no keys). |
+| **`split.py`** | **Enforced payout core.** Turn a captured `s` code + price into an on-chain split plan (90/10 recipients + bps), resolving the builder payout via `resolver`. The on-chain counterpart to `compute_payouts`. |
+| **`settler.py`** | Reference **settler**: read `s` at settlement → resolve → one atomic tx (deploy per-pair PushSplit → fund → distribute). Config-driven, so any x402 seller can reuse it. See `INTEGRATION.md`. |
 | **`buyer_client.py`** | Buyer side: the one client extension a builder registers to attach their code and earn. |
 | **`demo.py`** | End-to-end, in-memory, no network. |
 
