@@ -72,7 +72,7 @@ pip install cbor2 requests flask pytest   # cbor2 is the only hard dep of the co
 pip install cdp-sdk                        # optional: only for the CDP SQL API path
 python demo.py                            # the whole loop (off-chain + on-chain split), no network, ~1s
 python settler.py                         # print the atomic settle multicall for one payment
-pytest -q                                 # 44 tests (declare/decode + split math)
+pytest -q                                 # 53 tests (declare/decode + split math + Splits calldata)
 ```
 
 | File | What it is |
@@ -86,7 +86,7 @@ pytest -q                                 # 44 tests (declare/decode + split mat
 | **`queries.sql`** | Copy-paste attribution queries you can run **right now** in the no-auth SQL Playground. |
 | **`resolver.py`** | **Code → wallet.** Resolve any builder code to its **owner** and **payout address** via the Base ERC-721 registry (raw `eth_call`, no keys). |
 | **`split.py`** | **Enforced payout core.** Turn a captured `s` code + price into an on-chain split plan (90/10 recipients + bps), resolving the builder payout via `resolver`. The on-chain counterpart to `compute_payouts`. |
-| **`settler.py`** | Reference **settler**: read `s` at settlement → resolve → one atomic tx (deploy per-pair PushSplit → fund → distribute). Config-driven, so any x402 seller can reuse it. See `INTEGRATION.md`. |
+| **`settler.py`** | Reference **settler**: read `s` at settlement → resolve → one atomic tx (deploy per-pair PushSplit → fund → distribute). Emits ready-to-submit calldata against the confirmed Base PushSplitFactory; config-driven, so any x402 seller can reuse it. See `INTEGRATION.md`. |
 | **`buyer_client.py`** | Buyer side: the one client extension a builder registers to attach their code and earn. |
 | **`demo.py`** | End-to-end, in-memory, no network. |
 

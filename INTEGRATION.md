@@ -51,12 +51,24 @@ service clones it, sets their payout + share, and points their route's settlemen
 at their own instance. Trust stays local: each seller runs their own settler, so
 the builders *they* pay trust *them*, not you.
 
-**Open items to confirm before mainnet** (pending 0xSplits):
-1. `PushSplit.distribute()` is permissionless, and there's a canonical
-   factory + deterministic-address SDK on Base to compute the counterfactual
-   address server-side.
-2. Pre-funding an *undeployed* counterfactual split (USDC lands before deploy,
-   then deploy + distribute) is a supported pattern.
+**Confirmed by 0xSplits (2026-07-15) — the seam is now wired:**
+1. ✅ Canonical **PushSplitFactory V2.2** on Base:
+   [`0x8E8eB0cC6AE34A38B67D5Cf91ACa38f60bc3Ecf4`](https://basescan.org/address/0x8E8eB0cC6AE34A38B67D5Cf91ACa38f60bc3Ecf4#code)
+   (verified contract; canonical list:
+   [splits.org docs](https://splits.org/protocol/docs/core/split-v2#addresses)).
+   The counterfactual address is computed server-side with ONE `eth_call` to
+   `factory.isDeployed(split, owner=0, salt=0)` — `settler.predict_split_address`
+   does it with no web3 dependency, verified byte-for-byte against the live
+   factory.
+2. ✅ Pre-funding an *undeployed* counterfactual split is a **supported/tested
+   pattern** — `distribute` reads the balance at call time; arrival order doesn't
+   matter.
+
+`settler.py` now emits ready-to-submit calldata for the deploy
+(`createSplitDeterministic`) and `distribute` legs (`owner=0` → immutable split,
+`salt=0` → one canonical address per pair). What's left to you: the pull leg's
+calldata (built at runtime from the buyer's signed EIP-3009 authorization) and
+signing/submitting the multicall with your 7702 settler account.
 
 > The one way to keep CDP's sponsored settle *and* drop the settler is to route
 > the cut on a **request-time** id (one your server sees at 402 time) rather than

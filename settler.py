@@ -30,14 +30,18 @@ so nothing on-chain forces you to run the settler or to pass the real `s`. The
 contract enforces the ratio; you're trusted to run it. Fine for an affiliate
 program; not for adversarial counterparties.
 
-This module builds the *plan* and *call sequence*; the on-chain submission
-(7702 tx + Splits factory ABI) is the integration seam you wire — see the open
-items in INTEGRATION.md before mainnet.
+This module builds the *plan* and the *real calldata* for every leg (verified
+byte-for-byte against the live Base factory). The only piece left to you is
+signing + submitting the multicall with your 7702 settler account — every
+target/calldata pair below drops straight into its call list.
 """
 from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from typing import Optional
+
+import requests
 
 import resolver
 import split
@@ -51,13 +55,108 @@ BUILDER_SHARE_BPS = int(
 )
 BASE_RPC = os.environ.get("X402_BASE_RPC", resolver.DEFAULT_RPC)
 
-# Base mainnet addresses (verify before mainnet use).
+# Base mainnet addresses.
 USDC_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
-# 0xSplits PushSplit factory on Base. CONFIRM the address AND the deterministic
-# (CREATE2) address derivation against the Splits SDK before wiring — this is an
-# open item in INTEGRATION.md (Splits push variant: distribute() sends on
-# distribution, no separate withdraw).
-SPLITS_PUSH_FACTORY = os.environ.get("X402_SPLITS_PUSH_FACTORY", "")
+# 0xSplits PushSplitFactory V2.2 on Base — confirmed by the Splits team
+# (2026-07-15) and verified on-chain (Basescan: "PushSplitFactory", 0xSplits).
+# Canonical list: https://splits.org/protocol/docs/core/split-v2#addresses
+SPLITS_PUSH_FACTORY = os.environ.get(
+    "X402_SPLITS_PUSH_FACTORY", "0x8E8eB0cC6AE34A38B67D5Cf91ACa38f60bc3Ecf4"
+)
+
+ZERO_ADDRESS = "0x" + "00" * 20
+ZERO_SALT = "0x" + "00" * 32
+
+# ── Splits v2 calldata (no web3 dependency, mirrors resolver.py) ──────────────
+# 4-byte selectors, computed from the verified factory/wallet ABIs:
+_SEL_IS_DEPLOYED = "cd6bc121"   # isDeployed(Split,address,bytes32) → (address,bool)
+_SEL_CREATE_DET = "f79918b0"    # createSplitDeterministic(Split,address,address,bytes32)
+_SEL_DISTRIBUTE = "2d3f5537"    # distribute(Split,address,address)  [on the PushSplit]
+
+
+def _word(value: int) -> str:
+    return f"{value:064x}"
+
+
+def _addr_word(address: str) -> str:
+    return _word(int(address, 16))
+
+
+def encode_split_params(plan: split.SplitPlan) -> str:
+    """ABI-encode the ``SplitV2Lib.Split`` tuple from a plan (hex, no 0x).
+
+    Split = (address[] recipients, uint256[] allocations, uint256 totalAllocation,
+    uint16 distributionIncentive). Allocations are the plan's bps (sum = 10000);
+    incentive is 0 — the settler distributes as part of settling, it isn't paid.
+    """
+    recips = [addr for addr, _ in plan.recipients]
+    allocs = [bps for _, bps in plan.recipients]
+    n = len(recips)
+    head = [
+        _word(0x80),                 # offset of recipients[] within the tuple
+        _word(0x80 + 32 * (1 + n)),  # offset of allocations[]
+        _word(split.BPS_DENOM),      # totalAllocation
+        _word(0),                    # distributionIncentive
+    ]
+    tail = [_word(n), *(_addr_word(a) for a in recips),
+            _word(n), *(_word(v) for v in allocs)]
+    return "".join(head + tail)
+
+
+def is_deployed_calldata(plan: split.SplitPlan) -> str:
+    """Calldata for factory.isDeployed(split, owner=0, salt=0) — owner 0 makes the
+    split IMMUTABLE (recipients fixed forever), salt 0 makes one canonical address
+    per (recipients, allocations) pair. Verified byte-for-byte vs `cast calldata`."""
+    return ("0x" + _SEL_IS_DEPLOYED + _word(0x60)
+            + _addr_word(ZERO_ADDRESS) + ZERO_SALT[2:] + encode_split_params(plan))
+
+
+def create_split_calldata(plan: split.SplitPlan, *, creator: str = ZERO_ADDRESS) -> str:
+    """Calldata for factory.createSplitDeterministic(split, owner=0, creator, salt=0)
+    — the deploy leg. Same params as isDeployed, so it lands ON the predicted
+    address. Skip this leg when the pair's split is already deployed."""
+    return ("0x" + _SEL_CREATE_DET + _word(0x80) + _addr_word(ZERO_ADDRESS)
+            + _addr_word(creator) + ZERO_SALT[2:] + encode_split_params(plan))
+
+
+def distribute_calldata(plan: split.SplitPlan, *, distributor: str = ZERO_ADDRESS) -> str:
+    """Calldata for pushSplit.distribute(split, USDC, distributor) — pays every
+    recipient their bps of the split's CURRENT balance (arrival time irrelevant,
+    pre-deploy funding supported — confirmed by Splits). Incentive is 0 so
+    ``distributor`` is only recorded in the event; the settler address is fine."""
+    return ("0x" + _SEL_DISTRIBUTE + _word(0x60) + _addr_word(USDC_BASE)
+            + _addr_word(distributor) + encode_split_params(plan))
+
+
+def predict_split_address(
+    plan: split.SplitPlan,
+    *,
+    rpc_url: Optional[str] = None,
+    timeout: float = 20.0,
+) -> tuple[str, bool]:
+    """The pair's counterfactual PushSplit address + whether it's deployed yet.
+
+    One ``eth_call`` to factory.isDeployed — this is the address USDC is pulled
+    into and distribute is called on; funds may land there BEFORE deployment.
+    """
+    resp = requests.post(
+        rpc_url or BASE_RPC,
+        json={"jsonrpc": "2.0", "id": 1, "method": "eth_call",
+              "params": [{"to": SPLITS_PUSH_FACTORY,
+                          "data": is_deployed_calldata(plan)}, "latest"]},
+        timeout=timeout,
+    )
+    resp.raise_for_status()
+    body = resp.json()
+    if body.get("error"):
+        raise RuntimeError(f"isDeployed eth_call failed: {body['error']}")
+    return _decode_is_deployed(body["result"])
+
+
+def _decode_is_deployed(result: str) -> tuple[str, bool]:
+    """Decode isDeployed's (address split, bool exists) return words."""
+    words = result.removeprefix("0x")
+    return "0x" + words[24:64], int(words[64:128], 16) != 0
 
 
 @dataclass
@@ -67,6 +166,7 @@ class SettlementCall:
     step: str  # deploy_split | pull_funds | distribute
     target: str  # the contract this leg calls
     summary: str
+    data: Optional[str] = None  # ready-to-submit calldata (None = built at runtime)
 
 
 def plan_split(
@@ -92,13 +192,18 @@ def settlement_calls(
     *,
     amount_usdc: float,
     buyer_from: str,
+    split_address: Optional[str] = None,
+    deployed: bool = False,
 ) -> list[SettlementCall]:
     """The atomic multicall to submit in ONE tx (deploy → fund → distribute).
 
-    When `s` is unresolved there is no builder leg, so this is just the plain
-    transfer to the seller (let the stock facilitator handle those and only route
-    the builder-bearing ones through here, if you like). Returns a description of
-    the legs; wiring the actual submission (7702 tx + Splits SDK) is the seam.
+    ``split_address``/``deployed`` come from ``predict_split_address(plan)`` (one
+    eth_call); when the pair's split already exists the deploy leg is skipped.
+    The pull_funds leg's calldata is built at runtime from the buyer's signed
+    EIP-3009 authorization (it's in the X-PAYMENT payload) — everything else is
+    ready to submit. When `s` is unresolved there is no builder leg, so this is
+    just the plain transfer to the seller (let the stock facilitator handle those
+    and only route the builder-bearing ones through here, if you like).
     """
     calls: list[SettlementCall] = []
     if not plan.has_builder:
@@ -112,27 +217,31 @@ def settlement_calls(
         )
         return calls
 
+    split_addr = split_address or "<predict_split_address(plan)>"
     recips = ", ".join(f"{a}:{bps}bps" for a, bps in plan.recipients)
-    calls.append(
-        SettlementCall(
-            "deploy_split",
-            SPLITS_PUSH_FACTORY or "<SPLITS_PUSH_FACTORY>",
-            f"ensure per-pair PushSplit for [{recips}] (counterfactual; deploy on first funding)",
+    if not deployed:
+        calls.append(
+            SettlementCall(
+                "deploy_split",
+                SPLITS_PUSH_FACTORY,
+                f"deploy per-pair PushSplit for [{recips}] at {split_addr}",
+                data=create_split_calldata(plan),
+            )
         )
-    )
     calls.append(
         SettlementCall(
             "pull_funds",
             USDC_BASE,
-            f"receiveWithAuthorization {amount_usdc} USDC from {buyer_from} → the PushSplit",
+            f"receiveWithAuthorization {amount_usdc} USDC from {buyer_from} → {split_addr}",
         )
     )
     calls.append(
         SettlementCall(
             "distribute",
-            "<PushSplit address>",
+            split_addr,
             f"distribute → push {plan.builder_share_bps}bps to {plan.builder_payout} "
             f"({plan.builder_code}), remainder to {plan.seller_payout}",
+            data=distribute_calldata(plan),
         )
     )
     return calls
@@ -142,8 +251,8 @@ if __name__ == "__main__":
     # Offline demo — build a plan + the call sequence from a stubbed builder
     # payout (no network). Use plan_split(...) for the live registry resolve.
     demo_plan = split.build_split_plan(
-        seller_payout="0xSeller00000000000000000000000000000000",
-        builder_payout="0xBuilderAlice000000000000000000000000000",
+        seller_payout="0x2222222222222222222222222222222222222222",   # you
+        builder_payout="0x1111111111111111111111111111111111111111",  # bc_alice's
         builder_code="bc_alice",
         builder_share_bps=BUILDER_SHARE_BPS,
     )
@@ -154,3 +263,7 @@ if __name__ == "__main__":
     print("\natomic settle multicall (one tx):")
     for c in settlement_calls(demo_plan, amount_usdc=price, buyer_from="0xBuyer"):
         print(f"  [{c.step}] {c.target}\n      {c.summary}")
+        if c.data:
+            print(f"      calldata: {c.data[:10]}… ({(len(c.data) - 2) // 2} bytes)")
+    print("\n(live: predict_split_address(plan) gives the real per-pair address "
+          "+ whether it's deployed — one eth_call)")
