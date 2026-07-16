@@ -70,10 +70,44 @@ the builders *they* pay trust *them*, not you.
 calldata (built at runtime from the buyer's signed EIP-3009 authorization) and
 signing/submitting the multicall with your 7702 settler account.
 
+**Confirmed by Base (2026-07-16) — nothing native is coming, the settler stands:**
+1. ✅ Builder codes stay **attribution-only**; any revshare is on the seller. A
+   revshare demo ([x402-revshare-demo](https://github.com/MattWong-ca/x402-revshare-demo),
+   exploring [base/flywheel](https://github.com/base/flywheel)) is gauging demand
+   but "most likely won't be pursued in the near future". (Flywheel is campaign
+   escrow — sponsor pre-funds, a *manager* submits payouts — i.e. an on-chain
+   version of this kit's off-chain ledger path, not atomic-at-settlement.)
+2. ✅ CDP's income-splitting stance: **no scheme change** — "solve it via
+   `payTo` pointing at a splitting contract". That works only for
+   **request-time** identity (the escape hatch below); it structurally *cannot*
+   express builder codes, because `payTo` is fixed at 402 time and `s` arrives
+   inside the payment. So the settler is the only mechanism for `s`-driven
+   splits, and no spec/SDK change will obsolete it.
+3. ⚠️ A code's **payout address is not user-configurable today** — it's pinned
+   to the project owner's Base account. `resolver.py` pays `payout_address`,
+   which is correct now and stays correct if Base later unlocks it. (It also
+   means a builder can't currently re-point their payout at their own splitter —
+   see the note in §6.)
+4. ✅ `toTokenId`/`toCode` (ASCII bytes, big-endian) confirmed — matches what
+   `resolver.py` already verified against the on-chain contract.
+
+**Confirmed by MetaMask (2026-07-16) — no delegation rail needed:**
+1. ✅ When a client supports EIP-3009, Permit2 *and* ERC-7710, the x402 SDK
+   **always defaults to 3009**. MetaMask users therefore come down the exact
+   rail the settler already covers — there is no second rail to wire.
+2. ✅ Splitting inside a delegation redemption would need your own facilitator,
+   custom execution and updated permissions, and MetaMask themselves flag it as
+   likely **breaking the x402 spec** — same trust level as the settler, more
+   moving parts. Dropped.
+3. ✅ The 7702 authorization can't be batched inside the delegation for later
+   settlement; gas on a self-run facilitator is sponsorable when the redeemer is
+   a smart account — consistent with the Circle Paymaster note above.
+
 > The one way to keep CDP's sponsored settle *and* drop the settler is to route
 > the cut on a **request-time** id (one your server sees at 402 time) rather than
 > the payment-time `s` — then `payTo` can *be* the split. That's a different
-> mechanism than builder codes; noted here only as the escape hatch.
+> mechanism than builder codes; noted here only as the escape hatch — and it's
+> exactly the pattern CDP's "solve it via `payTo`" stance describes.
 
 ---
 
@@ -419,7 +453,7 @@ A fixed-recipient split can't be that contract — so with any of these you'd
 
 | Platform | Built for | Why it misses |
 |---|---|---|
-| **0xSplits / splits.org** | Split a pool among a **fixed** set; accumulate → `distribute` | Recipients fixed at creation; can't route to a runtime `s`. Non-atomic, no EIP-3009 pull. *Useful downstream* — a builder can set their code's payout to a 0xSplits split to divide **their own** earnings; zero change on your side. |
+| **0xSplits / splits.org** | Split a pool among a **fixed** set; accumulate → `distribute` | Recipients fixed at creation; can't route to a runtime `s`. Non-atomic, no EIP-3009 pull. *Downstream* use — a builder pointing their code's payout at their own split — is **not possible today**: Base pins `payout_address` to the project owner's account (not user-configurable yet). |
 | **Sablier** | **Time-based** streaming / vesting / airdrops | Wrong shape — streams X over a duration; we need an instant one-shot carve. |
 | **Superfluid** | Continuous **streams** + pool distributions | Time/stream oriented, *and* requires wrapping USDC into a SuperToken — friction against plain-USDC x402. |
 | *(OZ PaymentSplitter, thirdweb Split, Drips, Disperse)* | Fixed-recipient splits / batch sends | Same "known recipient set" assumption. |
