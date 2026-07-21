@@ -1,0 +1,7 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+# The e2e test pushes past the stack limit with default codegen.
+via_ir = true
+optimizer = true

@@ -59,9 +59,16 @@ precisely from `(recorded s code, price, cost)`.
 
 **Or enforce it on-chain.** Instead of paying out later, a **settler** can carve a
 flat cut (e.g. 10% of price) *at settlement* — **automatic, atomic, auditable** —
-by splitting each payment through an audited 0xSplits PushSplit. See `split.py`,
-`settler.py`, and `INTEGRATION.md` (incl. the honest trust level: you run the
-settler, so it's enforced-by-default but not cryptographically trustless).
+by splitting each payment through an audited 0xSplits PushSplit. On this path the
+route's `payTo` is the **settler account** (the only address that can redeem the
+buyer's signature), and it forwards into the split in the same tx. See `split.py`,
+`settler.py`, `fork-test/`, and `INTEGRATION.md` (incl. the honest trust level:
+you run the settler, so it's enforced-by-default but not cryptographically
+trustless).
+
+Payouts land ~2 base units light — a PushSplit keeps 1 unit and floors each
+share, so $1.00 pays $0.099999 / $0.899999. `split.amounts_units()` mirrors that
+exactly, so your ledger reconciles to the unit against the settle tx.
 
 ---
 
@@ -72,8 +79,15 @@ pip install cbor2 requests flask pytest   # cbor2 is the only hard dep of the co
 pip install cdp-sdk                        # optional: only for the CDP SQL API path
 python demo.py                            # the whole loop (off-chain + on-chain split), no network, ~1s
 python settler.py                         # print the atomic settle multicall for one payment
-pytest -q                                 # 53 tests (declare/decode + split math + Splits calldata)
+pytest -q                                 # 57 tests (declare/decode + split math + Splits calldata)
+
+cd fork-test && forge test                # 6 tests against a real Base mainnet fork (~4s, needs foundry)
 ```
+
+> **Wiring the settler:** set your route's `payTo` to `X402_SETTLER_ACCOUNT`, not
+> to your payout wallet. The buyer's signature names its recipient, so that's the
+> only address funds can enter through — the settler then forwards into the split
+> in the same tx. See `fork-test/` and `INTEGRATION.md`.
 
 | File | What it is |
 |------|------------|
@@ -86,9 +100,10 @@ pytest -q                                 # 53 tests (declare/decode + split mat
 | **`queries.sql`** | Copy-paste attribution queries you can run **right now** in the no-auth SQL Playground. |
 | **`resolver.py`** | **Code → wallet.** Resolve any builder code to its **owner** and **payout address** via the Base ERC-721 registry (raw `eth_call`, no keys). |
 | **`split.py`** | **Enforced payout core.** Turn a captured `s` code + price into an on-chain split plan (90/10 recipients + bps), resolving the builder payout via `resolver`. The on-chain counterpart to `compute_payouts`. |
-| **`settler.py`** | Reference **settler**: read `s` at settlement → resolve → one atomic tx (deploy per-pair PushSplit → fund → distribute). Emits ready-to-submit calldata against the confirmed Base PushSplitFactory; config-driven, so any x402 seller can reuse it. See `INTEGRATION.md`. |
+| **`settler.py`** | Reference **settler**: read `s` at settlement → resolve → one atomic tx (pull the buyer's USDC → fund the per-pair PushSplit → deploy it if new → distribute). Emits ready-to-submit calldata against the confirmed Base PushSplitFactory; config-driven, so any x402 seller can reuse it. See `INTEGRATION.md`. |
 | **`buyer_client.py`** | Buyer side: the one client extension a builder registers to attach their code and earn. |
 | **`demo.py`** | End-to-end, in-memory, no network. |
+| **`fork-test/`** | Foundry tests running the settle legs against **live** Base USDC + PushSplitFactory on a mainnet fork. Pins why `payTo` must be the settler, and the exact payout math. |
 
 ---
 
@@ -274,6 +289,12 @@ client.register_extension(BuilderCodeClientExtension("bc_yourcode"))
 - **Off-chain payout is your responsibility.** This kit records who is owed what;
   actually sending the USDC share is a separate job you run against
   `compute_payouts()`.
+- **The settler builds calldata; it doesn't sign or broadcast.** There's no key
+  handling anywhere in this repo. `settler.py` emits the target/calldata pairs —
+  wiring them to a funded 7702 account (nonce management, gas, liveness) is the
+  remaining integration step, and the one part `fork-test/` doesn't exercise (it
+  `vm.prank`s the settler rather than authorizing a real one). Do a fork test of
+  your own wiring before any mainnet money moves.
 
 ## References
 

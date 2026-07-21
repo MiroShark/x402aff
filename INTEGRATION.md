@@ -27,7 +27,8 @@ v1 is simpler** and lives in `split.py` + `settler.py`:
   **payment-time** `s` code (it rides *inside* the payment, not the request), so
   it isn't known when your 402 sets `payTo`. A settler therefore reads `s` at
   settle and does **one atomic tx** — r0ohafza's (Splits) recipe: a 7702 account
-  that *deploys the per-pair PushSplit → funds it → distributes*.
+  that *pulls the buyer's USDC → funds the per-pair PushSplit → deploys it if
+  new → distributes*.
 - **Per-pair CREATE2** (Abram/Splits): each `(seller, builder)` split has a
   deterministic address, deployed counterfactually only once it's funded.
 
@@ -65,10 +66,28 @@ the builders *they* pay trust *them*, not you.
    matter.
 
 `settler.py` now emits ready-to-submit calldata for the deploy
-(`createSplitDeterministic`) and `distribute` legs (`owner=0` → immutable split,
-`salt=0` → one canonical address per pair). What's left to you: the pull leg's
-calldata (built at runtime from the buyer's signed EIP-3009 authorization) and
+(`createSplitDeterministic`), `fund_split`/`payout_seller` (plain USDC
+`transfer`) and `distribute` legs (`owner=0` → immutable split, `salt=0` → one
+canonical address per pair). What's left to you: the pull leg's calldata (built
+at runtime from the buyer's signed EIP-3009 authorization) and
 signing/submitting the multicall with your 7702 settler account.
+
+**⚠️ Set the route's `payTo` to your settler account** (`X402_SETTLER_ACCOUNT`).
+The buyer's EIP-3009 authorization names its recipient, and
+`receiveWithAuthorization` further requires `msg.sender == to` — so funds can
+only enter through the address the 402 advertised. The per-pair split address is
+derived from `s`, which arrives *inside the payment*, after `payTo` was fixed, so
+the buyer can never have signed to it. **Pulling straight into the split reverts**
+(both reasons independently — see `fork-test/PullLeg.t.sol`). The settler is
+therefore the `payTo` and forwards into the split in the same tx. Note this means
+*every* payment on the route lands on the settler, including unattributed ones —
+those become pull + forward-to-seller rather than bypassing you.
+
+**Payouts carry ≤2 units of dust.** A PushSplit retains 1 base unit (warm-slot
+gas optimization) and floors each recipient's share, so a $1.00 payment pays
+$0.099999 / $0.899999. `split.amounts_units()` mirrors this exactly, so the
+ledger reconciles to the unit against the settle tx. Verified at multiple amounts
+in `fork-test/EndToEnd.t.sol`.
 
 **Confirmed by Base (2026-07-16) — nothing native is coming, the settler stands:**
 1. ✅ Builder codes stay **attribution-only**; any revshare is on the seller. A
@@ -445,8 +464,13 @@ is the opposite:
 
 - The builder is **different on every payment** — whatever `s` the buyer submits.
 - And `payTo` is fixed in the 402 **before the buyer reveals `s`**, so `payTo`
-  can't be a per-builder split address; it must be one fixed contract per seller
-  that reads `s` at settle and routes.
+  can't be a per-builder split address; it must be one fixed address per seller
+  that receives the payment and routes it once `s` is known.
+
+  (That fixed address is what v1 uses too — there it's the **settler account**
+  rather than a contract, which is why the settler is the route's `payTo` and
+  forwards into the per-pair split. Same constraint, resolved off-chain instead
+  of on-chain, at the cost of trusting the settler to run.)
 
 A fixed-recipient split can't be that contract — so with any of these you'd
 *still* need the router in front, i.e. the thing you were trying to avoid.

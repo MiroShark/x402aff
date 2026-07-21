@@ -84,8 +84,9 @@ def main() -> None:
                 builder_payout=plan.builder_payout,
                 builder_cut_usd=amounts[plan.builder_payout],
             )
-            print(f"  {pid} ({referer}): ${amounts[plan.builder_payout]:.2f} → builder, "
-                  f"${amounts[SELLER_PAYOUT]:.2f} → seller")
+            print(f"  {pid} ({referer}): ${amounts[plan.builder_payout]:.6f} → builder, "
+                  f"${amounts[SELLER_PAYOUT]:.6f} → seller "
+                  f"({plan.dust_units(1.00)} units dust left in the split)")
         else:
             print(f"  {pid} (no referer): $1.00 → seller (no split)")
 

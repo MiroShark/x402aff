@@ -20,9 +20,32 @@ def test_plan_splits_90_10_by_default():
     plan = split.build_split_plan(SELLER, BUILDER, builder_code="bc_alice")
     assert plan.has_builder
     assert dict(plan.recipients) == {BUILDER: 1000, SELLER: 9000}
+    # Not 0.10/0.90: a PushSplit retains 1 base unit and floors each share, so
+    # $1.00 pays out 99999/899999 units. Verified on a Base fork — see
+    # fork-test/EndToEnd.t.sol.
+    assert plan.amounts_units(1.00) == {BUILDER: 99_999, SELLER: 899_999}
+    assert plan.dust_units(1.00) == 2
     amounts = plan.amounts(1.00)
-    assert amounts[BUILDER] == pytest.approx(0.10)
-    assert amounts[SELLER] == pytest.approx(0.90)
+    assert amounts[BUILDER] == pytest.approx(0.099999)
+    assert amounts[SELLER] == pytest.approx(0.899999)
+
+
+def test_payout_never_exceeds_what_the_chain_pays():
+    """The ledger must never over-credit a builder — that's a real payout gap."""
+    plan = split.build_split_plan(SELLER, BUILDER, builder_code="bc_alice")
+    for price in (0.001, 0.01, 1.00, 4.20, 99.99, 1000.00):
+        units = plan.amounts_units(price)
+        assert sum(units.values()) <= split.to_units(price)
+        assert units[BUILDER] <= split.to_units(price) * 1000 // split.BPS_DENOM
+        # dust is bounded regardless of size: retained unit + one floor per leg
+        assert 0 <= plan.dust_units(price) <= split.SPLITS_RETAINED_UNITS + 1
+
+
+def test_builderless_plan_has_no_dust():
+    """No split contract in the path → plain transfer → seller gets every unit."""
+    plan = split.build_split_plan(SELLER, None)
+    assert plan.amounts_units(1.00) == {SELLER: 1_000_000}
+    assert plan.dust_units(1.00) == 0
 
 
 def test_recipient_bps_always_sum_to_denominator():
@@ -58,7 +81,7 @@ def test_share_out_of_range_rejected():
 def test_custom_share():
     plan = split.build_split_plan(SELLER, BUILDER, builder_share_bps=2500)
     assert dict(plan.recipients) == {BUILDER: 2500, SELLER: 7500}
-    assert plan.amounts(4.00)[BUILDER] == pytest.approx(1.00)
+    assert plan.amounts_units(4.00)[BUILDER] == 999_999  # floor(25% of 4.00 - 1 unit)
 
 
 def test_primary_code_picks_first_valid():
