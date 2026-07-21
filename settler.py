@@ -10,12 +10,23 @@ The flow, per settled payment:
 
     read `s` off the payment  ─▶  resolve builder payout (resolver)
         ─▶  build split plan (split)  ─▶  ONE atomic tx:
-              deploy the per-(seller,builder) PushSplit if new
-              → pull the buyer's USDC into it (EIP-3009)
+              pull the buyer's USDC to the settler (EIP-3009)
+              → forward it into the per-(seller,builder) PushSplit
+              → deploy that split if new
               → distribute → pushes the cut to the builder, the rest to you
 
+SET YOUR ROUTE'S `payTo` TO THE SETTLER ACCOUNT (`X402_SETTLER_ACCOUNT`). This is
+load-bearing, not a style choice. EIP-3009 binds the buyer's signature to one
+recipient and `receiveWithAuthorization` further requires `msg.sender == to`, so
+funds can ONLY enter via the address the 402 advertised. The per-pair split
+address is derived from the `s` code, which arrives *inside the payment* — after
+`payTo` was fixed — so the buyer can never have signed to it. Pulling straight
+into the split reverts on both counts (verified on a Base mainnet fork). Hence
+the settler is the payTo and forwards. It holds the money for the space of two
+instructions inside one tx; the split still decides the amounts.
+
 That single atomic tx is r0ohafza's (0xSplits) recipe: a 7702 account doing
-deploy + fund + distribute in one multicall, using an audited PushSplit so you
+pull + fund + deploy + distribute in one multicall, using an audited PushSplit so you
 write/audit no split math. See INTEGRATION.md.
 
 Why a settler at all: the builder is named by the payment-time `s` code (it rides
@@ -30,8 +41,10 @@ so nothing on-chain forces you to run the settler or to pass the real `s`. The
 contract enforces the ratio; you're trusted to run it. Fine for an affiliate
 program; not for adversarial counterparties.
 
-This module builds the *plan* and the *real calldata* for every leg (verified
-byte-for-byte against the live Base factory). The only piece left to you is
+This module builds the *plan* and the *real calldata* for every leg except the
+pull (which needs the buyer's runtime signature). The whole sequence — predicted
+address, deploy, forward, distribute — is verified end-to-end against the live
+Base factory on a mainnet fork; see `fork-test/`. The piece left to you is
 signing + submitting the multicall with your 7702 settler account — every
 target/calldata pair below drops straight into its call list.
 """
@@ -49,6 +62,10 @@ import split
 # ── Config — set these to make the kit yours (env-overridable) ────────────────
 # Where your share (the remainder after the builder cut) is paid.
 SELLER_PAYOUT = os.environ.get("X402_SELLER_PAYOUT", "")
+# Your 7702 settler account. THIS MUST BE THE ROUTE'S `payTo` — see the module
+# docstring. The buyer's EIP-3009 signature names its recipient and only that
+# recipient may redeem it, so funds can only enter via this address.
+SETTLER_ACCOUNT = os.environ.get("X402_SETTLER_ACCOUNT", "")
 # Cut to the referer builder code, in basis points (1000 = 10%).
 BUILDER_SHARE_BPS = int(
     os.environ.get("X402_BUILDER_SHARE_BPS", str(split.DEFAULT_BUILDER_SHARE_BPS))
@@ -72,6 +89,7 @@ ZERO_SALT = "0x" + "00" * 32
 _SEL_IS_DEPLOYED = "cd6bc121"   # isDeployed(Split,address,bytes32) → (address,bool)
 _SEL_CREATE_DET = "f79918b0"    # createSplitDeterministic(Split,address,address,bytes32)
 _SEL_DISTRIBUTE = "2d3f5537"    # distribute(Split,address,address)  [on the PushSplit]
+_SEL_TRANSFER = "a9059cbb"      # transfer(address,uint256)          [on USDC]
 
 
 def _word(value: int) -> str:
@@ -126,6 +144,14 @@ def distribute_calldata(plan: split.SplitPlan, *, distributor: str = ZERO_ADDRES
     ``distributor`` is only recorded in the event; the settler address is fine."""
     return ("0x" + _SEL_DISTRIBUTE + _word(0x60) + _addr_word(USDC_BASE)
             + _addr_word(distributor) + encode_split_params(plan))
+
+
+def transfer_calldata(to: str, price_usd: float) -> str:
+    """Calldata for USDC.transfer(to, amount) — the settler forwarding the pulled
+    payment on. Used both to fund the split and to pay a builderless payment
+    straight through to the seller."""
+    return ("0x" + _SEL_TRANSFER + _addr_word(to)
+            + _word(split.to_units(price_usd)))
 
 
 def predict_split_address(
@@ -194,31 +220,57 @@ def settlement_calls(
     buyer_from: str,
     split_address: Optional[str] = None,
     deployed: bool = False,
+    settler_account: Optional[str] = None,
 ) -> list[SettlementCall]:
-    """The atomic multicall to submit in ONE tx (deploy → fund → distribute).
+    """The atomic multicall to submit in ONE tx (pull → fund → deploy → distribute).
 
     ``split_address``/``deployed`` come from ``predict_split_address(plan)`` (one
     eth_call); when the pair's split already exists the deploy leg is skipped.
-    The pull_funds leg's calldata is built at runtime from the buyer's signed
-    EIP-3009 authorization (it's in the X-PAYMENT payload) — everything else is
-    ready to submit. When `s` is unresolved there is no builder leg, so this is
-    just the plain transfer to the seller (let the stock facilitator handle those
-    and only route the builder-bearing ones through here, if you like).
+
+    The buyer's EIP-3009 authorization names ``settler_account`` as its recipient
+    (that's your route's ``payTo``), so the pull lands on the settler and a
+    ``fund_split`` leg forwards it on — see the module docstring for why it can't
+    go straight into the split. Only ``pull_funds`` is built at runtime (it needs
+    the buyer's signature, which is in the X-PAYMENT payload); every other leg
+    below carries ready-to-submit calldata.
+
+    When `s` is unresolved there's no builder and no split — but the money still
+    arrives at the settler (``payTo`` is the settler for *every* payment on the
+    route), so it's pull + forward the full amount to the seller.
     """
-    calls: list[SettlementCall] = []
+    settler = settler_account or SETTLER_ACCOUNT or "<X402_SETTLER_ACCOUNT>"
+    calls: list[SettlementCall] = [
+        SettlementCall(
+            "pull_funds",
+            USDC_BASE,
+            f"receiveWithAuthorization {amount_usdc} USDC from {buyer_from} → "
+            f"{settler} (the route's payTo; only it can redeem the buyer's sig)",
+        )
+    ]
+
     if not plan.has_builder:
         calls.append(
             SettlementCall(
-                "pull_funds",
+                "payout_seller",
                 USDC_BASE,
-                f"transfer {amount_usdc} USDC from {buyer_from} → {plan.seller_payout} "
+                f"transfer {amount_usdc} USDC → {plan.seller_payout} "
                 "(no `s`/unregistered → 100% to seller, no split needed)",
+                data=transfer_calldata(plan.seller_payout, amount_usdc),
             )
         )
         return calls
 
     split_addr = split_address or "<predict_split_address(plan)>"
     recips = ", ".join(f"{a}:{bps}bps" for a, bps in plan.recipients)
+    calls.append(
+        SettlementCall(
+            "fund_split",
+            USDC_BASE,
+            f"transfer {amount_usdc} USDC → {split_addr} "
+            "(funding before deploy is supported — distribute reads balance)",
+            data=transfer_calldata(split_addr, amount_usdc) if split_address else None,
+        )
+    )
     if not deployed:
         calls.append(
             SettlementCall(
@@ -228,13 +280,6 @@ def settlement_calls(
                 data=create_split_calldata(plan),
             )
         )
-    calls.append(
-        SettlementCall(
-            "pull_funds",
-            USDC_BASE,
-            f"receiveWithAuthorization {amount_usdc} USDC from {buyer_from} → {split_addr}",
-        )
-    )
     calls.append(
         SettlementCall(
             "distribute",
@@ -259,7 +304,9 @@ if __name__ == "__main__":
     price = 1.00
     print(f"split plan for a ${price:.2f} payment (share = {BUILDER_SHARE_BPS} bps):")
     for addr, amt in demo_plan.amounts(price).items():
-        print(f"  {addr}  ${amt:.2f}")
+        print(f"  {addr}  ${amt:.6f}")
+    print(f"  ({demo_plan.dust_units(price)} base units stay in the split — "
+          "Splits keeps 1 unit warm and floors each share)")
     print("\natomic settle multicall (one tx):")
     for c in settlement_calls(demo_plan, amount_usdc=price, buyer_from="0xBuyer"):
         print(f"  [{c.step}] {c.target}\n      {c.summary}")

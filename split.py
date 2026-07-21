@@ -26,6 +26,20 @@ import resolver
 DEFAULT_BUILDER_SHARE_BPS = 1000
 BPS_DENOM = 10_000
 
+# USDC is 6-decimal; all on-chain math happens in these base units.
+USDC_DECIMALS = 6
+_UNITS_PER_USD = 10**USDC_DECIMALS
+
+# A Splits v2 PushSplit never pays out its last base unit — it leaves 1 behind so
+# the balance slot stays warm (a gas optimization). Confirmed on a Base mainnet
+# fork: a $1.00 payment pays $0.099999 / $0.899999, not $0.10 / $0.90.
+SPLITS_RETAINED_UNITS = 1
+
+
+def to_units(price_usd: float) -> int:
+    """Dollars → USDC base units (the integer the chain actually moves)."""
+    return int(round(price_usd * _UNITS_PER_USD))
+
 
 @dataclass
 class SplitPlan:
@@ -47,10 +61,40 @@ class SplitPlan:
     def has_builder(self) -> bool:
         return bool(self.builder_payout) and self.builder_share_bps > 0
 
-    def amounts(self, price_usd: float) -> dict[str, float]:
-        """Split ``price_usd`` across recipients by their bps (for the record)."""
+    def amounts_units(self, price_usd: float) -> dict[str, int]:
+        """What each recipient *actually receives on-chain*, in USDC base units.
+
+        This mirrors Splits v2 exactly (verified on a Base mainnet fork), so the
+        ledger reconciles to the penny against the settle tx:
+
+          * A PushSplit retains ``SPLITS_RETAINED_UNITS`` (1 unit) to keep its
+            balance slot warm — only ``balance - 1`` is ever distributable.
+          * Each recipient's share is **floored**, not rounded.
+
+        Both effects only apply when the money actually flows through a split. A
+        builderless plan is a plain USDC transfer, so the seller gets every unit.
+        """
+        units = to_units(price_usd)
+        if not self.has_builder:
+            return {self.seller_payout: units}
+        distributable = max(0, units - SPLITS_RETAINED_UNITS)
         return {
-            addr: round(price_usd * bps / BPS_DENOM, 6) for addr, bps in self.recipients
+            addr: distributable * bps // BPS_DENOM for addr, bps in self.recipients
+        }
+
+    def dust_units(self, price_usd: float) -> int:
+        """Units left behind in the split (retained unit + floor remainders).
+
+        Bounded by ``SPLITS_RETAINED_UNITS + len(recipients) - 1`` — i.e. 2 units
+        ($0.000002) for a two-way split, regardless of payment size.
+        """
+        return to_units(price_usd) - sum(self.amounts_units(price_usd).values())
+
+    def amounts(self, price_usd: float) -> dict[str, float]:
+        """``amounts_units`` in dollars — what each recipient really receives."""
+        return {
+            addr: units / _UNITS_PER_USD
+            for addr, units in self.amounts_units(price_usd).items()
         }
 
 

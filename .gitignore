@@ -10,6 +10,12 @@ venv/
 affiliation.db
 *.db
 
+# Foundry (fork-test/) — deps + build artifacts. Run `forge install` to set up.
+fork-test/lib/
+fork-test/out/
+fork-test/cache/
+fork-test/foundry.lock
+
 # Env / secrets (never commit CDP keys or JWTs)
 .env
 .env.*

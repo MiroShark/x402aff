@@ -82,11 +82,44 @@ def test_settlement_calls_carry_real_calldata():
         _plan(), amount_usdc=1.00, buyer_from="0xBuyer",
         split_address="0x4eDe36f2e215A06856612D4B98Afa56c3aFfFA66", deployed=False,
     )
-    assert [c.step for c in calls] == ["deploy_split", "pull_funds", "distribute"]
-    deploy, pull, dist = calls
-    assert deploy.target == settler.SPLITS_PUSH_FACTORY and deploy.data
+    assert [c.step for c in calls] == [
+        "pull_funds", "fund_split", "deploy_split", "distribute"
+    ]
+    pull, fund, deploy, dist = calls
     assert pull.target == settler.USDC_BASE and pull.data is None  # buyer-sig leg
+    assert fund.target == settler.USDC_BASE and fund.data
+    assert deploy.target == settler.SPLITS_PUSH_FACTORY and deploy.data
     assert dist.target == "0x4eDe36f2e215A06856612D4B98Afa56c3aFfFA66" and dist.data
+
+
+def test_pull_leg_targets_the_settler_not_the_split():
+    """The buyer signed to `payTo` = the settler; only it can redeem the auth.
+
+    Pulling straight into the split reverts on Base (fork-verified) — see
+    fork-test/PullLeg.t.sol.
+    """
+    calls = settler.settlement_calls(
+        _plan(), amount_usdc=1.00, buyer_from="0xBuyer",
+        split_address="0x4eDe36f2e215A06856612D4B98Afa56c3aFfFA66",
+        settler_account="0x7702770277027702770277027702770277027702",
+    )
+    pull = calls[0]
+    assert pull.step == "pull_funds"
+    assert "0x7702770277027702770277027702770277027702" in pull.summary
+    assert "0x4eDe36f2e215A06856612D4B98Afa56c3aFfFA66" not in pull.summary
+
+
+def test_fund_split_leg_moves_the_full_amount():
+    calls = settler.settlement_calls(
+        _plan(), amount_usdc=1.00, buyer_from="0xBuyer",
+        split_address="0x4eDe36f2e215A06856612D4B98Afa56c3aFfFA66", deployed=True,
+    )
+    fund = next(c for c in calls if c.step == "fund_split")
+    # transfer(0x4eDe…, 1_000_000)
+    assert fund.data == settler.transfer_calldata(
+        "0x4eDe36f2e215A06856612D4B98Afa56c3aFfFA66", 1.00
+    )
+    assert fund.data.endswith(f"{1_000_000:064x}")
 
 
 def test_settlement_calls_skip_deploy_when_split_exists():
@@ -94,14 +127,17 @@ def test_settlement_calls_skip_deploy_when_split_exists():
         _plan(), amount_usdc=1.00, buyer_from="0xBuyer",
         split_address="0x4eDe36f2e215A06856612D4B98Afa56c3aFfFA66", deployed=True,
     )
-    assert [c.step for c in calls] == ["pull_funds", "distribute"]
+    assert [c.step for c in calls] == ["pull_funds", "fund_split", "distribute"]
 
 
-def test_no_builder_is_still_a_plain_transfer():
+def test_no_builder_still_pulls_then_forwards_to_seller():
+    """`payTo` is the settler for EVERY payment on the route, so even an
+    unattributed one has to be pulled and forwarded — it can't bypass us."""
     plan = split.build_split_plan(SELLER, None)
     calls = settler.settlement_calls(plan, amount_usdc=1.00, buyer_from="0xBuyer")
-    assert [c.step for c in calls] == ["pull_funds"]
-    assert calls[0].target == settler.USDC_BASE
+    assert [c.step for c in calls] == ["pull_funds", "payout_seller"]
+    assert all(c.target == settler.USDC_BASE for c in calls)
+    assert calls[1].data == settler.transfer_calldata(SELLER, 1.00)
 
 
 def test_predict_split_address_parses_rpc_result(monkeypatch):
