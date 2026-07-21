@@ -1,4 +1,4 @@
-"""Tests for the 0xSplits v2 PushSplit calldata layer (push_split.py) — no network.
+"""Tests for the 0xSplits v2 PushSplit calldata layer (push_split.py) - no network.
 
 The expected calldata below was generated with foundry's `cast calldata` and the
 predicted address cross-checked LIVE against the Base PushSplitFactory
@@ -39,7 +39,7 @@ def _plan() -> split.SplitPlan:
 
 
 def test_factory_is_the_confirmed_base_address():
-    # PushSplitFactory V2.2 — confirmed by Splits (2026-07-15), verified on Basescan.
+    # PushSplitFactory V2.2 - confirmed by Splits (2026-07-15), verified on Basescan.
     assert push_split.SPLITS_PUSH_FACTORY == "0x8E8eB0cC6AE34A38B67D5Cf91ACa38f60bc3Ecf4"
 
 
@@ -62,7 +62,7 @@ def test_distribute_calldata_targets_usdc():
 
 
 def test_distribute_incentive_is_zero():
-    # The caller of distribute earns nothing — the split's distributionIncentive
+    # The caller of distribute earns nothing - the split's distributionIncentive
     # field (last word of the encoded params before the arrays) is 0.
     params = push_split.encode_split_params(_plan())
     # head = [recips_off, allocs_off, totalAllocation, distributionIncentive]

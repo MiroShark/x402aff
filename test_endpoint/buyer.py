@@ -1,4 +1,4 @@
-"""Buyer side of the live test — pay the endpoint once, attributing to a builder.
+"""Buyer side of the live test - pay the endpoint once, attributing to a builder.
 
 Run this with YOUR OWN funded Base wallet to drive one real payment through the
 deployed endpoint. It:
@@ -8,7 +8,7 @@ deployed endpoint. It:
   2. attaches the same code as ``s`` inside the payment (BuilderCodeClientExtension),
      so the CDP facilitator writes it on-chain
   3. signs the EIP-3009 authorization to that payTo and lets the x402 client
-     auto-retry — CDP settles it (sponsored gas) into the split
+     auto-retry - CDP settles it (sponsored gas) into the split
 
 Needs: a Base wallet holding ≥ the price in USDC (default $0.02). Gas is
 sponsored by CDP, so no ETH is required.
@@ -18,7 +18,7 @@ sponsored by CDP, so no ETH is required.
     export BUILDER_CODE=leap_wallet           # who earns the 10%
     python3 test_endpoint/buyer.py
 
-On success it prints the settle tx hash — paste that back for verification, then
+On success it prints the settle tx hash - paste that back for verification, then
 run distribute.py to release the split.
 """
 from __future__ import annotations
@@ -74,7 +74,7 @@ def main() -> int:
         except Exception:
             print(f"PAYMENT-RESPONSE (raw): {settle}")
     else:
-        print("no PAYMENT-RESPONSE header — payment may not have settled.")
+        print("no PAYMENT-RESPONSE header - payment may not have settled.")
     return 0 if resp.status_code == 200 else 1
 
 

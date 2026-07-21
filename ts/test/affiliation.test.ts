@@ -1,5 +1,5 @@
 /**
- * Tests for the TypeScript Affiliation facade — offline (mock viem transport).
+ * Tests for the TypeScript Affiliation facade - offline (mock viem transport).
  *
  * The calldata cross-check below asserts the TS encoder produces the SAME bytes
  * as `cast` / the Python kit (test_push_split.py), so a TS seller and a Python
@@ -32,7 +32,7 @@ const BUILDER = "0x1111111111111111111111111111111111111111" as const;
 const SPLIT = "0x3773000000000000000000000000000000002e38" as const;
 
 // isDeployed((address[],uint256[],uint256,uint16),address,bytes32) for
-// recipients [BUILDER, SELLER], allocations [1000, 9000] — generated with
+// recipients [BUILDER, SELLER], allocations [1000, 9000] - generated with
 // `cast calldata` and verified live against the Base factory in test_push_split.py.
 const CAST_IS_DEPLOYED =
   "0xcd6bc121" +

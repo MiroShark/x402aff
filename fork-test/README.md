@@ -1,8 +1,8 @@
-# fork-test — the CDP path, against real Base mainnet
+# fork-test - the CDP path, against real Base mainnet
 
 This forks Base mainnet locally and runs the settle → split → distribute path
 against the **live** USDC and 0xSplits PushSplitFactory contracts. Fake buyer,
-fake money (`deal`), real contracts — no keys, no funds, nothing broadcast.
+fake money (`deal`), real contracts - no keys, no funds, nothing broadcast.
 
 ```bash
 cd fork-test
@@ -12,11 +12,11 @@ forge test -vv                         # 2 tests; ~2s warm, longer on a cold for
 
 ## What it pins down
 
-**`CdpPath.t.sol`** — the exact path the kit uses in production: the stock CDP
+**`CdpPath.t.sol`** - the exact path the kit uses in production: the stock CDP
 facilitator settles a **plain USDC transfer** to `payTo` (= the per-pair split),
 then anyone releases it. The hex blobs are verbatim output of
 `push_split.create_split_calldata` / `distribute_calldata` / `is_deployed_calldata`
-— nothing here re-implements the kit's encoding.
+- nothing here re-implements the kit's encoding.
 
 | Test | Asserts |
 |---|---|
@@ -30,7 +30,7 @@ decides the amounts).
 
 It also pins the payout math. Splits v2 retains 1 base unit (warm-slot gas
 optimization) and floors each share, so a $1.00 payment pays **$0.099999 /
-$0.899999** — mirrored by `split.amounts_units()` so the ledger reconciles to the
+$0.899999** - mirrored by `split.amounts_units()` so the ledger reconciles to the
 unit.
 
 ## Regenerating the calldata
@@ -52,6 +52,6 @@ print('DISTRIBUTE ', push_split.distribute_calldata(plan))
 
 ## Not covered
 
-Broadcasting for real — the test uses `deal`/`prank` and never submits a
+Broadcasting for real - the test uses `deal`/`prank` and never submits a
 transaction to Base. The one live money step (a real payment through a deployed
 endpoint) is in `../RUNBOOK-live-test.md`, and was validated on mainnet.

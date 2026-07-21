@@ -1,4 +1,4 @@
-"""Monitor every per-builder split for undistributed USDC — no local ledger.
+"""Monitor every per-builder split for undistributed USDC - no local ledger.
 
 The problem: on the CDP path, each payment lands in a per-(seller, builder) split
 and *sits* until someone calls distribute. You need to see which splits are
@@ -7,12 +7,12 @@ holding funds that are ready to release.
 This discovers them with zero local state, using CDP's own attribution index:
 
   1. ask the CDP SQL API for every builder code (`s`) that ever settled alongside
-     your app code (`a`) — i.e. every builder who drove a payment to you
+     your app code (`a`) - i.e. every builder who drove a payment to you
   2. for each, predict the pair's split address and read its live USDC balance
   3. report which splits hold distributable funds, and emit the distribute call
 
 Needs CDP_API_KEY_ID + CDP_API_KEY_SECRET (same CDP JWT auth as cdp_sql.py) and a Base
-RPC (set X402_BASE_RPC to a paid one — the balance reads add up).
+RPC (set X402_BASE_RPC to a paid one - the balance reads add up).
 
     X402_BUILDER_CODE=bc_...  X402_SELLER_PAYOUT=0x...  python3 monitor.py
 """
@@ -122,12 +122,12 @@ if __name__ == "__main__":
     print("─" * 74)
     for r in rows:
         flag = "◀ DISTRIBUTE" if r.needs_distribution else (
-            "unregistered" if r.builder_payout is None else "—")
+            "unregistered" if r.builder_payout is None else "-")
         print(f"{r.builder_code:<22} {_fmt_usd(r.balance_units):>12} "
               f"{_fmt_usd(r.distributable_units):>14}  {str(r.deployed):>8}  {flag}")
 
     print("─" * 74)
-    print(f"{len(pending)} split(s) ready to distribute — {_fmt_usd(total_pending)} pending\n")
+    print(f"{len(pending)} split(s) ready to distribute - {_fmt_usd(total_pending)} pending\n")
 
     for r in pending:
         plan = split.build_split_plan(SELLER_PAYOUT, r.builder_payout,

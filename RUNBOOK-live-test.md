@@ -1,7 +1,7 @@
-# Live mainnet test — the CDP path (no facilitator)
+# Live mainnet test - the CDP path (no facilitator)
 
 Prove the enforced split works on **real Base mainnet with real USDC**, for a few
-cents, in two stages. Stage 1 needs **zero changes to your production server** —
+cents, in two stages. Stage 1 needs **zero changes to your production server** -
 it proves the on-chain half in isolation. Stage 2 puts a real payment through
 your live endpoint.
 
@@ -21,11 +21,11 @@ settler, no facilitator to run. Verified on a fork in
   `leap_wallet` (registered, resolves to `0xa06c…54c8`) just to watch the money
   land somewhere real.
 - A funded Base wallet with ~$1 USDC + a few cents of ETH for gas (this is your
-  distributor/tester wallet — **not** the settler; there is no settler here).
+  distributor/tester wallet - **not** the settler; there is no settler here).
 
 ---
 
-## Stage 1 — on-chain half, no server change (~$0.10 + gas)
+## Stage 1 - on-chain half, no server change (~$0.10 + gas)
 
 This simulates exactly what CDP does (a plain USDC transfer to `payTo`) so you can
 prove deploy + distribute on mainnet without touching production.
@@ -40,7 +40,7 @@ prove deploy + distribute on mainnet without touching production.
    "
    ```
 
-2. **Send a tiny USDC transfer to that address** from your test wallet — this is
+2. **Send a tiny USDC transfer to that address** from your test wallet - this is
    the exact byte a stock facilitator would emit. Send e.g. `$0.10` (100000 units)
    of USDC on Base to the predicted address. (Any wallet/cast; no special calldata.)
 
@@ -67,12 +67,12 @@ prove deploy + distribute on mainnet without touching production.
    ```
 
 ✅ **Stage 1 proves:** the per-pair split deploys at the predicted address, funds
-sent by *anyone* distribute correctly, and the ratio is enforced on-chain — with
+sent by *anyone* distribute correctly, and the ratio is enforced on-chain - with
 real USDC, no server involved.
 
 ---
 
-## Stage 2 — one real payment through the live endpoint (~$0.02 + $0)
+## Stage 2 - one real payment through the live endpoint (~$0.02 + $0)
 
 The endpoint is already deployed and wired (see `test_endpoint/`): it declares
 `a = bc_c12702g2`, reads `X-Builder-Code`, and sets `payTo` = the per-pair split
@@ -100,12 +100,12 @@ USDC on `eip155:8453`; no header → `payTo` = the seller wallet.
      the proof CDP still writes attribution on this path.**
    - Check the split's balance rose by $0.02 (`distribute.split_balance_units`).
 
-3. **Distribute** exactly as Stage 1, step 3 — deploy if first use, then
+3. **Distribute** exactly as Stage 1, step 3 - deploy if first use, then
    distribute. `leap_wallet` (`0xa06c…54c8`) gets 10%, the seller (`0x95dd…71cc`)
    gets 90%.
 
 ✅ **Stage 2 proves:** the real CDP facilitator, with sponsored gas, settles into
-your per-pair split AND writes `a`/`s`/`w` — i.e. you get enforced split *and*
+your per-pair split AND writes `a`/`s`/`w` - i.e. you get enforced split *and*
 keep attribution, with no facilitator of your own.
 
 ---
@@ -114,7 +114,7 @@ keep attribution, with no facilitator of your own.
 
 - Every `payto_for_request` failure falls back to `X402_SELLER_PAYOUT`, so a bad
   resolve is an **unsplit** payment, never a failed one. To disable the whole
-  path, stop reading the header — `payTo` reverts to your wallet.
+  path, stop reading the header - `payTo` reverts to your wallet.
 - Funds in a split are **never stranded**: the split is ownerless and
   `distribute` is permissionless, so worst case they wait for the next
   `distribute` call. The builder can even call it themselves.
@@ -124,5 +124,5 @@ keep attribution, with no facilitator of your own.
 
 ## What to hand back for review
 
-The Stage 2 settle tx hash — paste it and I'll confirm the `a`/`s`/`w` decode and
+The Stage 2 settle tx hash - paste it and I'll confirm the `a`/`s`/`w` decode and
 that the split balance/payout reconciles to the unit against `amounts()`.

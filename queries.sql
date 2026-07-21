@@ -1,4 +1,4 @@
--- CDP SQL API — builder-code / x402 attribution queries.
+-- CDP SQL API - builder-code / x402 attribution queries.
 --
 -- Run these with ZERO setup in the SQL Playground (just sign in to CDP Portal):
 --   https://portal.cdp.coinbase.com/onchain-tools/sql-api
@@ -6,12 +6,12 @@
 --   Authorization: Bearer <JWT>   body: {"sql": "<one query>", "cache": {"maxAgeMs": 5000}}
 --
 -- Dialect: ClickHouse (CoinbaSeQL), read-only SELECT only. Every Base table
--- carries `action` (+1 added / -1 removed) — use `HAVING sum(action) > 0` (or
+-- carries `action` (+1 added / -1 removed) - use `HAVING sum(action) > 0` (or
 -- `WHERE action = 1`) so re-orged rows don't count. Docs: docs.cdp.coinbase.com/data/sql-api
 --
 -- Two attribution tables:
 --   base.transaction_attributions   builder_code  (one code per row, keyed by transaction_hash)
---   base.decoded_user_operations    builder_codes (Array — for ERC-4337 userOp settlements)
+--   base.decoded_user_operations    builder_codes (Array - for ERC-4337 userOp settlements)
 -- Both are role-FLAT: they give the SET of codes on a tx, not which is a/w/s.
 
 
@@ -31,7 +31,7 @@ HAVING sum(action) > 0;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 2. Every settlement that carried YOUR referer code, last 7 days.
---    "Which runs am I owed a share on?" — reconcile against your own records.
+--    "Which runs am I owed a share on?" - reconcile against your own records.
 -- ─────────────────────────────────────────────────────────────────────────────
 SELECT block_timestamp, transaction_hash, builder_code
 FROM base.transaction_attributions
@@ -43,7 +43,7 @@ LIMIT 1000;
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 3. Attribution leaderboard — attributed settlements per builder code, 30 days.
+-- 3. Attribution leaderboard - attributed settlements per builder code, 30 days.
 --    A full analytics rollup with no per-run lookups at all.
 -- ─────────────────────────────────────────────────────────────────────────────
 SELECT builder_code, count() AS attributed_txs

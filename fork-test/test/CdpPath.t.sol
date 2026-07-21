@@ -11,7 +11,7 @@ interface IUSDC {
 /// Can the STOCK CDP facilitator settle straight into a Splits PushSplit?
 ///
 /// INTEGRATION.md §5 says a transfer into a contract "just moves funds in, where
-/// they sit. No function runs; nothing splits." True — but for a PushSplit that
+/// they sit. No function runs; nothing splits." True - but for a PushSplit that
 /// is not the end of the story: `distribute` is permissionless and reads the
 /// balance at call time, so ANY caller can fan the funds out afterwards.
 ///
@@ -34,7 +34,7 @@ contract CdpPathTest is Test {
 
     bytes constant CREATE_CD = hex"f79918b00000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000000000000027100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000200000000000000000000000011111111111111111111111111111111111111110000000000000000000000002222222222222222222222222222222222222222000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000003e80000000000000000000000000000000000000000000000000000000000002328";
 
-    // distributor field names 0x7702… — deliberately NOT the caller below, to
+    // distributor field names 0x7702… - deliberately NOT the caller below, to
     // show the field is an incentive payee, not an authorization.
     bytes constant DISTRIBUTE_CD = hex"2d3f55370000000000000000000000000000000000000000000000000000000000000060000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda029130000000000000000000000007702770277027702770277027702770277027702000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000000000000027100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000200000000000000000000000011111111111111111111111111111111111111110000000000000000000000002222222222222222222222222222222222222222000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000003e80000000000000000000000000000000000000000000000000000000000002328";
 
@@ -63,13 +63,13 @@ contract CdpPathTest is Test {
         assertEq(USDC.balanceOf(splitAddr), amount, "funds landed in the split");
         assertEq(builderBefore, USDC.balanceOf(BUILDER), "nothing split yet");
 
-        // 2. Deploy the split — permissionless, from an unrelated address.
+        // 2. Deploy the split - permissionless, from an unrelated address.
         vm.prank(RANDO);
         (bool okCreate, bytes memory createRet) = FACTORY.call(CREATE_CD);
         require(okCreate, "createSplitDeterministic reverted");
         assertEq(abi.decode(createRet, (address)), splitAddr, "predicted address holds");
 
-        // 3. Distribute — also from the unrelated address, which is NOT the
+        // 3. Distribute - also from the unrelated address, which is NOT the
         //    `distributor` named in the calldata.
         vm.prank(RANDO);
         (bool okDist,) = splitAddr.call(DISTRIBUTE_CD);
@@ -89,7 +89,7 @@ contract CdpPathTest is Test {
         assertEq(USDC.balanceOf(RANDO), 0, "an unrelated distributor earns nothing");
     }
 
-    /// The funds are not merely "sitting" — while they wait, nobody can redirect
+    /// The funds are not merely "sitting" - while they wait, nobody can redirect
     /// them. The split is immutable (owner = 0), so there is no admin path out.
     function test_fundsWaitingInTheSplitCannotBeRedirected() public {
         uint256 amount = 1_000_000;
@@ -102,7 +102,7 @@ contract CdpPathTest is Test {
         (bool okCreate,) = FACTORY.call(CREATE_CD);
         require(okCreate, "create reverted");
 
-        // The seller — the party with the most to gain — tries to pull the
+        // The seller - the party with the most to gain - tries to pull the
         // builder's cut back out. There is no owner, so there is no lever.
         vm.prank(SELLER);
         (bool okOwner, bytes memory ownerRet) = splitAddr.call(abi.encodeWithSignature("owner()"));

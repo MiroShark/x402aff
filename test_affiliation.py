@@ -1,4 +1,4 @@
-"""Tests for the Affiliation facade (affiliation.py) — no network.
+"""Tests for the Affiliation facade (affiliation.py) - no network.
 
 Resolution is monkeypatched so these run offline; they check the facade wires the
 underlying modules together correctly and keeps its safe-fallback contract.
@@ -171,7 +171,7 @@ def test_resolve_failure_falls_back_and_logs(monkeypatch, caplog):
     aff = _aff()
     with caplog.at_level("WARNING", logger="affiliation"):
         pt = aff.resolve(_FakeCtx("bc_alice"))
-    assert pt.address == SELLER          # never raises — payment still works
+    assert pt.address == SELLER          # never raises - payment still works
     assert pt.attributed is False
     assert pt.error is not None
     assert any("resolve failed" in r.message for r in caplog.records)

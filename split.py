@@ -1,4 +1,4 @@
-"""The split plan for one builder-attributed payment — the ENFORCED payout core.
+"""The split plan for one builder-attributed payment - the ENFORCED payout core.
 
 Given a builder code and the price, this resolves *who* to pay and produces the
 *split plan*: the recipient set + basis-point allocations (builder cut + seller
@@ -25,7 +25,7 @@ BPS_DENOM = 10_000
 USDC_DECIMALS = 6
 _UNITS_PER_USD = 10**USDC_DECIMALS
 
-# A Splits v2 PushSplit never pays out its last base unit — it leaves 1 behind so
+# A Splits v2 PushSplit never pays out its last base unit - it leaves 1 behind so
 # the balance slot stays warm (a gas optimization). Confirmed on a Base mainnet
 # fork: a $1.00 payment pays $0.099999 / $0.899999, not $0.10 / $0.90.
 SPLITS_RETAINED_UNITS = 1
@@ -41,7 +41,7 @@ class SplitPlan:
     """How one payment is carved up on-chain.
 
     ``recipients`` is ``[(address, allocation_bps), ...]`` summing to
-    ``BPS_DENOM`` — the exact shape a per-pair PushSplit is created with. When the
+    ``BPS_DENOM`` - the exact shape a per-pair PushSplit is created with. When the
     ``s`` code is missing or unregistered there is no builder leg and the whole
     amount goes to the seller (never stranded).
     """
@@ -63,7 +63,7 @@ class SplitPlan:
         ledger reconciles to the penny against the settle tx:
 
           * A PushSplit retains ``SPLITS_RETAINED_UNITS`` (1 unit) to keep its
-            balance slot warm — only ``balance - 1`` is ever distributable.
+            balance slot warm - only ``balance - 1`` is ever distributable.
           * Each recipient's share is **floored**, not rounded.
 
         Both effects only apply when the money actually flows through a split. A
@@ -80,13 +80,13 @@ class SplitPlan:
     def dust_units(self, price_usd: float) -> int:
         """Units left behind in the split (retained unit + floor remainders).
 
-        Bounded by ``SPLITS_RETAINED_UNITS + len(recipients) - 1`` — i.e. 2 units
+        Bounded by ``SPLITS_RETAINED_UNITS + len(recipients) - 1`` - i.e. 2 units
         ($0.000002) for a two-way split, regardless of payment size.
         """
         return to_units(price_usd) - sum(self.amounts_units(price_usd).values())
 
     def amounts(self, price_usd: float) -> dict[str, float]:
-        """``amounts_units`` in dollars — what each recipient really receives."""
+        """``amounts_units`` in dollars - what each recipient really receives."""
         return {
             addr: units / _UNITS_PER_USD
             for addr, units in self.amounts_units(price_usd).items()
@@ -138,7 +138,7 @@ def resolve_and_plan(
     """Resolve the referer code ``s`` → payout via the Base registry, then plan.
 
     ``s_code`` may be comma-joined (layered clients); the split pays the *primary*
-    (first valid) code — the single-``s`` v1 policy. An unregistered or missing
+    (first valid) code - the single-``s`` v1 policy. An unregistered or missing
     code yields a seller-only plan, so a bad/absent ``s`` never blocks settlement.
     """
     code = primary_code(s_code)

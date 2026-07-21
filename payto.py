@@ -1,8 +1,8 @@
-"""Request-time ``payTo`` — the enforced split, no facilitator of your own.
+"""Request-time ``payTo`` - the enforced split, no facilitator of your own.
 
 If the buyer's app names the builder *at 402 time* (a header on the unpaid
 request), then ``payTo`` can simply BE the per-pair split, and the stock CDP
-facilitator settles into it with sponsored gas — no settler, no 7702, no key
+facilitator settles into it with sponsored gas - no settler, no 7702, no key
 handling on your side.
 
     unpaid request (carries X-Builder-Code)
@@ -12,18 +12,18 @@ handling on your side.
                           └─▶ distribute.py fans it out later, permissionlessly
 
 Why this is *enforced*: the split is created ownerless (``owner = 0``), so once
-funds land there the ratio is fixed and nobody — including you — can claw the
+funds land there the ratio is fixed and nobody - including you - can claw the
 builder's cut back. ``distribute`` is permissionless, so the builder can even
 call it themselves. Verified on a Base mainnet fork in ``fork-test/CdpPath.t.sol``
 and end-to-end on Base mainnet (see ``RUNBOOK-live-test.md``).
 
 The tradeoff is non-atomicity: funds sit in the split until someone calls
 ``distribute`` (safe while they wait, and batching many payments into one
-distribute is cheaper than splitting per payment — see ``monitor.py``).
+distribute is cheaper than splitting per payment - see ``monitor.py``).
 
 What it costs the buyer: their client must send the code on the **unpaid**
 request, not only inside the payment. That is one header (``X-Builder-Code``)
-beyond the standard ``s`` extension — see ``buyer_client.py`` and the browser
+beyond the standard ``s`` extension - see ``buyer_client.py`` and the browser
 ``test_endpoint/try.html``. Buyers who don't send it still pay normally; they
 just route to the seller with no split.
 
@@ -44,7 +44,7 @@ import split
 # The header a buyer's client sets on the unpaid request. Same grammar as `s`.
 BUILDER_CODE_HEADER = "X-Builder-Code"
 
-# Where the unsplit remainder — and every unattributed payment — is paid.
+# Where the unsplit remainder - and every unattributed payment - is paid.
 SELLER_PAYOUT = os.environ.get("X402_SELLER_PAYOUT", "")
 
 
@@ -55,7 +55,7 @@ class PayTo:
     address: str
     plan: split.SplitPlan
     split_deployed: bool
-    #: False when the code was missing, unregistered, or could not be resolved —
+    #: False when the code was missing, unregistered, or could not be resolved -
     #: i.e. ``address`` is the seller's own wallet and no split will happen.
     attributed: bool
     #: Set when a lookup failed rather than simply finding no builder. Log it;
@@ -108,7 +108,7 @@ def payto_for_request(
     """Resolve the ``payTo`` for one 402. Never raises.
 
     No code, an unregistered code, or a failed lookup all yield the seller's own
-    wallet — the payment still works, it just isn't split.
+    wallet - the payment still works, it just isn't split.
     """
     seller = seller_payout or SELLER_PAYOUT
     if not seller:
@@ -144,7 +144,7 @@ def payto_for_request(
         if use_cache:
             _CACHE[key] = result
         return result
-    except Exception as exc:  # noqa: BLE001 — a bad lookup must not break the 402
+    except Exception as exc:  # noqa: BLE001 - a bad lookup must not break the 402
         # Deliberately NOT cached: this is transient (RPC 429s, timeouts) and a
         # cached failure would strand that builder for the whole process life.
         return PayTo(

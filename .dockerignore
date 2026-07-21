@@ -2,7 +2,7 @@
 .env
 .env.*
 
-# Foundry deps/artifacts — huge, irrelevant to the server.
+# Foundry deps/artifacts - huge, irrelevant to the server.
 fork-test/lib/
 fork-test/out/
 fork-test/cache/
