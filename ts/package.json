@@ -1,0 +1,22 @@
+{
+  "name": "@x402-affiliation/kit",
+  "version": "0.1.0",
+  "description": "Builder-code affiliation for x402 sellers — the Affiliation facade (TypeScript port of affiliation.py).",
+  "type": "module",
+  "exports": {
+    ".": "./src/affiliation.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test 'test/**/*.test.ts'"
+  },
+  "keywords": ["x402", "builder-codes", "0xsplits", "base", "affiliation"],
+  "license": "MIT",
+  "dependencies": {
+    "viem": "^2.52.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "typescript": "^5.6.3"
+  }
+}

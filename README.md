@@ -1,25 +1,50 @@
 # x402 Builder-Code Affiliation Kit
 
-Pay the builders whose apps drive payments to your x402 API — **enforced
-on-chain, at settlement, with no facilitator of your own to run.**
+**Give the apps that send you paying users a cut — enforced on-chain, at
+settlement, with no facilitator of your own to run.**
 
-If you sell an API behind an x402 paywall, this is the whole machinery for:
-"when someone's app pays me on behalf of their user, split the payment so that
-app's builder gets a cut — automatically, verifiably, on Base."
+If you sell an API behind an [x402](https://x402.org) paywall, this is the whole
+machinery for: *"when someone's app pays me on behalf of their user, split the
+payment so that app's builder earns a share — automatically, verifiably, on
+Base."*
 
-> Validated end-to-end on **Base mainnet**: a real browser payment settled through
-> the Coinbase CDP facilitator into a per-builder 0xSplits split, with `a`/`s`/`w`
-> written on-chain (decoded by this kit's own parser). See
-> [`RUNBOOK-live-test.md`](./RUNBOOK-live-test.md) and the live endpoint under
-> [`test_endpoint/`](./test_endpoint).
+> Validated end-to-end on **Base mainnet**: a real browser payment settled
+> through the Coinbase CDP facilitator into a per-builder [0xSplits](https://splits.org)
+> split, with `a`/`s`/`w` attribution written on-chain (and decoded back out by
+> this kit's own parser). See [`RUNBOOK-live-test.md`](./RUNBOOK-live-test.md) and
+> the live endpoint in [`test_endpoint/`](./test_endpoint).
 
 ---
 
-## The one idea
+## What it enables
+
+Turn your x402 endpoint into an **affiliate program** with no backend for it:
+
+- **Referral revenue-share, on autopilot.** A wallet, agent, or app that drives a
+  payment to your API earns a cut (default **10%**). You keep the rest.
+- **Enforced, not promised.** The cut lands in an ownerless, immutable
+  [0xSplits](https://splits.org) contract at settlement. Once the money's there,
+  **nobody — including you — can redirect the builder's share.** That's what makes
+  it a credible offer to builders.
+- **No new infrastructure.** No settler, no self-run facilitator, no smart
+  contract you write or audit. The stock **Coinbase CDP facilitator** does the
+  settling (gas sponsored); an audited 0xSplits contract does the splitting.
+- **Stacks with Base's builder rewards** on the volume you drive.
+- **Zero-friction for the builder.** They add *one line* to their x402 client to
+  attach their code. They never touch your code or your repo.
+
+The catch, stated plainly: payouts aren't atomic. Money settles into the split
+correctly on its own, but **releasing** it (`distribute`) is a separate,
+permissionless call — you, a keeper, or the builder can trigger it.
+[`monitor.py`](./monitor.py) shows which splits are holding funds.
+
+---
+
+## How it works (the one idea)
 
 [Base Builder Codes](https://docs.cdp.coinbase.com/x402/core-concepts/builder-codes)
 are the **ERC-8021 Schema 2** on-chain attribution standard for x402. Three codes
-can ride on a paid request:
+ride on a paid request:
 
 | Code | Who it names | Who sets it |
 |------|--------------|-------------|
@@ -30,12 +55,10 @@ can ride on a paid request:
 `s` is the affiliation you care about — it names *which builder* to pay. The kit
 turns that into money with one move:
 
-**Set the route's `payTo` to a per-`(you, builder)` [0xSplits](https://splits.org)
-PushSplit.** The buyer's app names its builder on the request, your server sets
-`payTo` to that pair's split, and the **stock CDP facilitator settles straight
-into it** — sponsored gas, `a`/`s`/`w` still written on-chain. The split is
-ownerless and immutable, so the builder's cut (default **10%**) is enforced: once
-the money lands, nobody — including you — can redirect it.
+**Set the route's `payTo` to a per-`(you, builder)` 0xSplits PushSplit.** The
+buyer's app names its builder on the request, your server points `payTo` at that
+pair's split, and the **CDP facilitator settles straight into it** — sponsored
+gas, `a`/`s`/`w` still written on-chain.
 
 ```
   buyer's app          YOUR /run                    CDP facilitator        Base
@@ -48,132 +71,69 @@ the money lands, nobody — including you — can redirect it.
                      10% builder                90% you
 ```
 
-No settler. No self-run facilitator. No smart contract you write or audit — the
-split is an audited 0xSplits PushSplit. The only thing that isn't automatic is
-**releasing** the money (`distribute`), and that's permissionless — anyone,
-including the builder, can trigger it. [`monitor.py`](./monitor.py) tells you
-which splits are holding funds ready to release.
-
 ---
 
-## The money, precisely
+## Integrate it (one object)
 
-- The buyer's payment settles **in full into the split** at request time.
-- The split pays **10% to the builder's registered payout, 90% to you** — the cut
-  is `X402_BUILDER_SHARE_BPS` (default `1000` = 10%).
-- Payouts land ~2 base units light: a PushSplit keeps 1 unit warm and floors each
-  share, so $1.00 pays `$0.099999 / $0.899999`. `split.amounts_units()` mirrors
-  that exactly, so your ledger reconciles to the unit against the settle tx.
-- It **stacks** with Base's own builder-rewards program on the volume driven.
+Already run an x402 route? The whole integration is one configured object —
+[`affiliation.py`](./affiliation.py) — that folds the pieces below behind a couple
+of lines.
 
-The trust level, honestly: because `s` is a self-asserted tag, resolving it tells
-you *where the money goes* (the code owner's registered payout), not that the
-submitter is *entitled* to that code. For an affiliate program that's fine — the
-registered owner gets paid regardless of who drove the traffic.
-
----
-
-## Run it
-
-```bash
-pip install cbor2 requests pytest        # core deps
-pip install cdp-sdk                       # optional: monitor.py's CDP SQL auth
-python3 -m pytest -q                       # 68 tests (declare/decode + split math + payTo + Splits calldata)
-
-cd fork-test && forge test                # 2 tests: CDP settle → split → distribute, on a Base mainnet fork
-```
-
-To stand up a live endpoint and take a real payment, see
-[`test_endpoint/`](./test_endpoint) and [`RUNBOOK-live-test.md`](./RUNBOOK-live-test.md).
-
-| File | What it is |
-|------|------------|
-| **`builder_code.py`** | The core. `declare_builder_code()` (declare `a`) + `parse_builder_code_suffix()` (decode `a`/`s`/`w` from a settle tx). No framework, no db. |
-| **`resolver.py`** | **Code → payout wallet.** Resolves any builder code to its registered payout via the Base ERC-721 registry (raw `eth_call`, no keys). |
-| **`split.py`** | **Split plan.** A builder code + price → the recipient set + bps a per-pair PushSplit encodes (10/90). Pure arithmetic. |
-| **`push_split.py`** | **0xSplits v2 calldata + address.** `predict_split_address()` (the pair's counterfactual split, one `eth_call`) + the deploy/distribute calldata. No web3 dep. |
-| **`payto.py`** | **The method.** `X-Builder-Code` header → the split address to advertise as `payTo` for the 402. Never raises — any failure falls back to your wallet (unsplit, never failed). |
-| **`distribute.py`** | **Release a funded split.** Emits the (deploy + distribute) calldata that fans a split out to builder + seller. Permissionless. |
-| **`monitor.py`** | **What's owed.** Discovers every builder who paid you (from CDP's index) and reports which splits are holding distributable funds. |
-| **`buyer_client.py`** | Buyer side: the client extension a builder registers to attach their code and earn. |
-| **`cdp_sql.py`** · **`queries.sql`** | Thin CDP SQL API client + copy-paste attribution queries (used by `monitor.py`; also runnable in the no-auth Playground). |
-| **`test_endpoint/`** | A deployable FastAPI x402 endpoint on this exact path — plus `try.html`, a one-page browser client to pay it live. |
-| **`fork-test/`** | Foundry test running CDP-settle → split → distribute against **live** Base USDC + PushSplitFactory on a mainnet fork. |
-
----
-
-## Step 1 — Declare your app code (`a`)
-
-Get a code at [base.dev](https://base.dev) → *Settings → Builder Codes*, set
-`X402_BUILDER_CODE=bc_yourcode`, and merge the declaration into your route's
-`extensions`:
+Get an app code at [base.dev](https://base.dev) → *Settings → Builder Codes*, then:
 
 ```python
-from builder_code import declare_builder_code
+from affiliation import Affiliation
 
-extensions = {}
-extensions.update(declare_builder_code("bc_yourcode"))
-# → {"builder-code": {"info": {"a": "bc_yourcode"}, "schema": {...}}}
+aff = Affiliation(app_code="bc_yourcode", seller_payout=YOUR_WALLET)
 ```
 
-The declaration rides inside the base64'd `402` header; the CDP facilitator
-appends the on-chain `a`/`s`/`w` suffix at settlement. **Your server builds no
-transaction.** A malformed code must never disable the paywall — wrap it and skip
-attribution on error.
-
-## Step 2 — Route `payTo` to the split
-
-When the buyer's app names its builder (an `X-Builder-Code` header on the request),
-resolve `payTo` per request to that pair's split:
+### 1 + 2. Declare `a` and route `payTo` — two attributes on your route
 
 ```python
-import payto
-
-code = payto.builder_code_from_headers(request.headers)   # X-Builder-Code
-pt = payto.payto_for_request(code, seller_payout=YOUR_WALLET)
-route_config.pay_to = pt.address     # the split, or your wallet if no/unknown code
+PaymentOption(scheme="exact", price="$0.02", network="eip155:8453",
+              pay_to=aff.pay_to)            # ← per-request split, from the header
+RouteConfig(..., extensions=aff.extensions) # ← declares your app code `a`
 ```
 
-`payto_for_request` resolves the code, predicts the pair's split address (one
-`eth_call`, cached), and **never raises** — a missing/unknown code or a failed
-lookup falls back to your own wallet, so the payment always works; it just isn't
-split. See [`test_endpoint/app.py`](./test_endpoint/app.py) for the full wiring as
-a FastAPI `DynamicPayTo` callback.
+- **`aff.extensions`** declares `a`. It rides inside the base64'd `402` header;
+  the CDP facilitator appends the on-chain `a`/`s`/`w` suffix at settlement — your
+  server builds no transaction.
+- **`aff.pay_to`** is a drop-in x402 `DynamicPayTo` callback. When the buyer's app
+  names its builder (an `X-Builder-Code` header), it returns that pair's split
+  address; otherwise your own wallet. It resolves + caches in one `eth_call` and
+  **never raises** — a missing, unknown, or unresolvable code falls back to your
+  wallet, so the payment always works; it just isn't split.
 
-> **Why a header?** `payTo` is fixed when the 402 goes out, but the standard `s`
+Not on the Python x402 SDK? `aff.pay_to_for(request.headers)` is the sync
+equivalent (works with any headers mapping), and the whole thing is portable — see
+**Any x402 stack** below. See
+[`test_endpoint/app.py`](./test_endpoint/app.py) for the full FastAPI wiring.
+
+> **Why a header?** `payTo` is locked when the 402 goes out, but the standard `s`
 > code only arrives *inside* the payment. So the buyer's app opts in by naming its
 > builder at request time (one header, alongside the usual `s` extension). Buyers
-> that don't send it pay you normally, unsplit. See the note in `payto.py`.
+> that don't send it pay you normally, unsplit.
 
-## Step 3 — Let CDP settle
+Then point the route at the **CDP facilitator** (mainnet) and you're done on the
+request path — CDP settles a plain USDC transfer into the split and writes
+`a`/`s`/`w`. Nothing else to do here; the split just fills.
 
-Point your route at the CDP facilitator (mainnet). When the buyer pays, CDP
-settles a plain USDC transfer into the split and writes `a`/`s`/`w` on-chain.
-Nothing to do here — the split just fills. **Verify** any settle tx by pasting it
-into [buildercode-checker.vercel.app](https://buildercode-checker.vercel.app/),
-or decode it yourself:
-
-```python
-import builder_code, requests
-inp = requests.post(RPC, json={"jsonrpc":"2.0","id":1,
-        "method":"eth_getTransactionByHash","params":[settle_tx]}).json()["result"]["input"]
-builder_code.parse_builder_code_suffix(inp)   # {'a': 'bc_yourcode', 's': ['bc_alice'], 'w': 'cdp_facil1'}
-```
-
-## Step 4 — Distribute (release the cut)
+### 3. Distribute (release the cut)
 
 Funds accumulate in each pair's split until someone calls `distribute`. It's
-permissionless — you, a keeper, or the builder themselves can trigger it:
+permissionless — you, a keeper, or the builder can trigger it:
 
 ```python
-import payto, distribute
+calls, balance = aff.release("bc_alice")   # deploy (first use) + distribute calldata
+# submit each (target, data) from any funded Base account — gas is cents
 
-pt = payto.payto_for_request("bc_alice", seller_payout=YOUR_WALLET)
-calls, balance = distribute.distribute_plan(pt.plan)   # deploy (first use) + distribute
-# submit each (target, data) from a funded Base account — gas is cents
+for s in aff.pending():                     # every split holding distributable funds
+    print(s.builder_code, s.distributable_units)
 ```
 
-Use [`monitor.py`](./monitor.py) to see every split holding funds:
+`aff.pending()` discovers every builder who paid you (straight from CDP's
+attribution index — no local ledger); [`monitor.py`](./monitor.py) is the same
+scan as a CLI, and prints which splits are ready:
 
 ```
 $ X402_BUILDER_CODE=bc_yourcode X402_SELLER_PAYOUT=0x… python3 monitor.py
@@ -184,22 +144,200 @@ bc_alice                  $12.400000     $12.399999     True   ◀ DISTRIBUTE
 bc_bob                     $0.000000      $0.000000     False   —
 ```
 
-It discovers builders straight from CDP's attribution index — no local ledger —
-and emits ready-to-run `cast` commands for the ones that need distributing.
+That's the whole integration. Everything below is customization, other-language
+ports, and the fine print.
 
 ---
 
-## Buyer side — how a builder earns (for your docs)
+## Customize the payout split
 
-A builder registers one client extension so every payment carries their code as
-`s`, **and** sends `X-Builder-Code` on the request so `payTo` routes to their
-split. See [`buyer_client.py`](./buyer_client.py) and, for a browser, the
-`fetchWithPayment` + header pattern in [`test_endpoint/try.html`](./test_endpoint/try.html).
+### Change the cut
+
+The builder's share is basis points (`10000` = 100%). Default is `1000` (10%).
+Set it globally with an env var, or per-request in code:
+
+```bash
+export X402_BUILDER_SHARE_BPS=1500        # 15% to the builder, 85% to you
+```
 
 ```python
-client.register_extension(BuilderCodeClientExtension("bc_yourcode"))  # attaches s
-# ...and send header X-Builder-Code: bc_yourcode on the request → payTo = the split
+# per seller — overrides the env default
+aff = Affiliation(app_code="bc_yourcode", seller_payout=YOUR_WALLET, builder_share_bps=2500)
 ```
+
+Range is `0..10000`. `0` disables the split (100% to you); the code still gets
+`a`/`s`/`w` attribution on-chain, just no revenue share.
+
+### Heads-up: the ratio is part of the address
+
+Each split's address is derived (CREATE2) from **its recipients *and* their
+allocations**. So changing `builder_share_bps` produces a *different* split
+address for the same builder:
+
+- Payments made **before** the change stay in the old split and distribute at the
+  **old** ratio (it's immutable — that's the guarantee).
+- Payments **after** the change route to a new address at the new ratio.
+
+Pick your default and keep it stable per builder. Changing it is safe (no money is
+lost) but effectively opens a second split for that builder.
+
+### More than two recipients (a platform fee, a partner, …)
+
+The default plan is two-way (builder, seller), but a PushSplit takes any number of
+recipients whose allocations sum to `10000`. Build a `SplitPlan` directly and the
+rest of the kit — address prediction, distribute — just works:
+
+```python
+import split, push_split, distribute
+
+plan = split.SplitPlan(
+    seller_payout=YOUR_WALLET,
+    builder_code="bc_alice",
+    builder_payout="0xBuilder…",
+    builder_share_bps=1000,
+    recipients=[                     # must sum to 10000
+        ("0xBuilder…",   1000),      # 10% builder
+        ("0xPlatform…",   500),      #  5% platform fee
+        (YOUR_WALLET,    8500),      # 85% you
+    ],
+)
+address, deployed = push_split.predict_split_address(plan)   # set payTo = this
+calls, balance    = distribute.distribute_plan(plan)         # releases all three
+```
+
+Payout math (`plan.amounts_units`) mirrors Splits exactly for any recipient
+count, so your ledger still reconciles to the unit.
+
+---
+
+## Any x402 stack (Node, Go, Rust, …)
+
+The kit ships in Python, but **the method is language-agnostic** — it's just
+"advertise the split's address as `payTo`." Any x402 server, in any language, does
+the same three reads. Only two on-chain contracts are involved:
+
+- **Builder Codes registry** `0x000000BC7E6457e610fe52Dcc0ca5b3ce59C8E80` — code → payout address
+- **0xSplits PushSplitFactory** `0x8E8eB0cC6AE34A38B67D5Cf91ACa38f60bc3Ecf4` — the pair → its deterministic split address
+
+### TypeScript / Node — shipped and tested
+
+The [`ts/`](./ts) package is a full port of `affiliation.py` (same `Affiliation`
+surface, only `viem` as a dependency). Its tests assert the encoding **byte-for-byte
+against the Python/`cast` bytes**, so it resolves the *identical* split address:
+
+```ts
+import { Affiliation } from "@x402-affiliation/kit";
+
+const aff = new Affiliation({ appCode: "bc_yourcode", sellerPayout: "0x…" });
+const payTo = await aff.payToFor(req.headers);   // the split, or your wallet
+const extensions = aff.extensions;               // declares your `a`
+// payouts: const { calls, balanceUnits } = await aff.release("bc_alice");
+```
+
+See [`ts/README.md`](./ts/README.md). The recipe below is the same logic spelled
+out for **any other language** (Go, Rust, …).
+
+### Buyer side — already official, everywhere
+
+The builder attaches their code with the **official x402 extension** (TypeScript /
+JS). No port needed:
+
+```ts
+import { BuilderCodeClientExtension } from "@x402/extensions/builder-code";
+
+client.registerExtension(new BuilderCodeClientExtension("bc_yourcode")); // attaches s
+// …and send header  X-Builder-Code: bc_yourcode  on the request → payTo routes to the split
+```
+
+(See [`test_endpoint/try.html`](./test_endpoint/try.html) for the full browser
+flow.) A TS **seller** can likewise declare `a` with that same official package.
+
+### Seller side — the recipe (three view-calls)
+
+To resolve `payTo` for a request in any language:
+
+1. **code → payout.** `payoutAddress(uint256)` on the registry, where the token id
+   is the code's ASCII bytes read as a big-endian integer. (Reverts / zero →
+   unregistered: fall back to your wallet.)
+2. **build the Split tuple.** `recipients = [builderPayout, sellerPayout]`,
+   `allocations = [builderBps, 10000 - builderBps]`, `totalAllocation = 10000`,
+   `distributionIncentive = 0`.
+3. **tuple → address.** `isDeployed(Split, owner=0x0, salt=0x0)` on the factory
+   returns `(address, bool)`. That address is your `payTo`.
+
+Here's 1–3 in TypeScript with `viem` — the core of what the [`ts/`](./ts) package
+ships, condensed:
+
+```ts
+import { createPublicClient, http } from "viem";
+import { base } from "viem/chains";
+
+const client   = createPublicClient({ chain: base, transport: http(process.env.BASE_RPC) });
+const REGISTRY = "0x000000BC7E6457e610fe52Dcc0ca5b3ce59C8E80";
+const FACTORY  = "0x8E8eB0cC6AE34A38B67D5Cf91ACa38f60bc3Ecf4";
+const ZERO32   = "0x" + "00".repeat(32);
+
+// builder code → ERC-721 token id (ASCII bytes as a big-endian int)
+const toTokenId = (code: string) => BigInt("0x" + Buffer.from(code, "ascii").toString("hex"));
+
+// 1. code → registered payout address (null when unregistered)
+async function payoutOf(code: string) {
+  try {
+    const addr = await client.readContract({
+      address: REGISTRY,
+      abi: [{ name: "payoutAddress", type: "function", stateMutability: "view",
+              inputs: [{ type: "uint256" }], outputs: [{ type: "address" }] }],
+      functionName: "payoutAddress", args: [toTokenId(code)],
+    });
+    return BigInt(addr) === 0n ? null : addr;
+  } catch { return null; }
+}
+
+const SPLIT_ABI = [{ name: "isDeployed", type: "function", stateMutability: "view",
+  inputs: [
+    { name: "split", type: "tuple", components: [
+      { name: "recipients", type: "address[]" }, { name: "allocations", type: "uint256[]" },
+      { name: "totalAllocation", type: "uint256" }, { name: "distributionIncentive", type: "uint16" }]},
+    { name: "owner", type: "address" }, { name: "salt", type: "bytes32" }],
+  outputs: [{ type: "address" }, { type: "bool" }] }] as const;
+
+// 2 + 3. (seller, builder) → the deterministic PushSplit address → your payTo
+async function payToFor(seller: string, code: string, builderBps = 1000) {
+  const builder = await payoutOf(code);
+  if (!builder) return seller;                       // no/unknown code → unsplit
+  const split = {
+    recipients: [builder, seller],
+    allocations: [BigInt(builderBps), BigInt(10000 - builderBps)],
+    totalAllocation: 10000n, distributionIncentive: 0,
+  };
+  const [address] = await client.readContract({
+    address: FACTORY, abi: SPLIT_ABI, functionName: "isDeployed",
+    args: [split, "0x0000000000000000000000000000000000000000", ZERO32],
+  });
+  return address;                                    // set the route's payTo to this
+}
+```
+
+Wire `payToFor(...)`'s result into however your x402 server middleware exposes a
+per-request / dynamic `payTo`. Distribute later with the same factory's
+`createSplitDeterministic` (first use) + the split's `distribute(Split, USDC,
+distributor)` — see [`push_split.py`](./push_split.py) for the exact calldata,
+verified byte-for-byte against the live Base factory.
+
+---
+
+## The money, precisely
+
+- The buyer's payment settles **in full into the split** at request time.
+- The split pays the configured cut (default **10% builder / 90% you**).
+- Payouts land ~2 base units light: a PushSplit keeps 1 unit warm and floors each
+  share, so a $1.00 payment pays `$0.099999 / $0.899999`. `split.amounts_units()`
+  mirrors that exactly, so your ledger reconciles to the unit against the settle tx.
+
+The trust level, honestly: because `s` is a self-asserted tag, resolving it tells
+you *where the money goes* (the code owner's registered payout), not that the
+submitter is *entitled* to that code. For an affiliate program that's fine — the
+registered owner gets paid regardless of who drove the traffic.
 
 ---
 
@@ -229,13 +367,42 @@ resolver.resolve("leap_wallet")
 
 ---
 
+## Run it & what's in the box
+
+```bash
+pip install cbor2 requests pytest        # core deps
+pip install cdp-sdk                       # optional: monitor.py's CDP SQL auth
+python3 -m pytest -q                       # declare/decode + split math + payTo + Splits calldata
+
+cd fork-test && forge test                # 2 tests: CDP settle → split → distribute, on a Base mainnet fork
+```
+
+To stand up a live endpoint and take a real payment, see
+[`test_endpoint/`](./test_endpoint) and [`RUNBOOK-live-test.md`](./RUNBOOK-live-test.md).
+
+| File | What it is |
+|------|------------|
+| **`affiliation.py`** | **Start here.** The `Affiliation` facade — one object for the whole integration: `aff.pay_to` (route callback), `aff.extensions` (declare `a`), `aff.release()` / `aff.pending()` (payouts). Wraps everything below. |
+| **`builder_code.py`** | The core. `declare_builder_code()` (declare `a`) + `parse_builder_code_suffix()` (decode `a`/`s`/`w` from a settle tx). No framework, no db. |
+| **`resolver.py`** | **Code → payout wallet.** Resolves any builder code to its registered payout via the Base ERC-721 registry (raw `eth_call`, no keys). |
+| **`split.py`** | **Split plan.** A builder code + price → the recipient set + bps a per-pair PushSplit encodes. Pure arithmetic. |
+| **`push_split.py`** | **0xSplits v2 calldata + address.** `predict_split_address()` (the pair's counterfactual split, one `eth_call`) + the deploy/distribute calldata. No web3 dep. |
+| **`payto.py`** | **The method.** `X-Builder-Code` header → the split address to advertise as `payTo`. Never raises — any failure falls back to your wallet (unsplit, never failed). |
+| **`distribute.py`** | **Release a funded split.** Emits the (deploy + distribute) calldata that fans a split out to its recipients. Permissionless. |
+| **`monitor.py`** | **What's owed.** Discovers every builder who paid you (from CDP's index) and reports which splits are holding distributable funds. |
+| **`buyer_client.py`** | Buyer side: the client extension a builder registers to attach their code and earn. |
+| **`cdp_sql.py`** · **`queries.sql`** | Thin CDP SQL API client + copy-paste attribution queries (used by `monitor.py`; also runnable in the no-auth Playground). |
+| **`test_endpoint/`** | A deployable FastAPI x402 endpoint on this exact path — plus `try.html`, a one-page browser client to pay it live. |
+| **`fork-test/`** | Foundry test running CDP-settle → split → distribute against **live** Base USDC + PushSplitFactory on a mainnet fork. |
+
+---
+
 ## Caveats (read before shipping)
 
 - **Mainnet + CDP only.** Codes are only written on-chain on **Base mainnet via
   the Coinbase CDP facilitator**. On testnet / the free `x402.org` facilitator the
   declaration is harmless but nothing lands — and the registry/factory this kit
-  reads only exist on mainnet, so `payto`/`resolver`/`push_split` have nothing to
-  resolve against on testnet.
+  reads only exist on mainnet.
 - **Use a paid RPC.** `resolver.py` defaults to `https://mainnet.base.org`, which
   `429`s after a few calls in a row. Set `X402_BASE_RPC` — a rate-limited resolve
   means a builder silently isn't split (it falls back to your wallet).
@@ -243,9 +410,9 @@ resolver.resolve("leap_wallet")
   deterministic split address, deployed lazily on its first `distribute` and
   reused forever after. The deploy is a one-time ~cents gas cost per builder.
 - **Distribute costs gas.** The buyer's payment is gasless (CDP-sponsored), but
-  `distribute` is a plain tx — the caller pays a few cents of ETH. The caller
-  earns nothing (`distributionIncentive = 0`) and can only send funds to the
-  split's fixed recipients.
+  `distribute` is a plain tx — the caller pays a few cents of ETH, earns nothing
+  (`distributionIncentive = 0`), and can only send funds to the split's fixed
+  recipients.
 - **Hand-rolled by necessity.** The x402 *Python* SDK ships no builder-code
   module, so `builder_code.py` declares + decodes directly (on TypeScript use the
   official `@x402/extensions/builder-code`). Verify against a real settlement

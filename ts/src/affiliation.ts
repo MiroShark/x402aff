@@ -1,0 +1,485 @@
+/**
+ * One object that is the whole integration — declare, payTo, distribute.
+ *
+ * A TypeScript port of the kit's Python `Affiliation` facade (affiliation.py),
+ * for x402 sellers running the Node / TS reference stack. Same three on-chain
+ * reads, same safe-fallback contract, same surface:
+ *
+ * ```ts
+ * import { Affiliation } from "@x402-affiliation/kit";
+ *
+ * const aff = new Affiliation({ appCode: "bc_yourcode", sellerPayout: "0x…" });
+ *
+ * // ── on your x402 route ──
+ * const payTo = await aff.payToFor(req.headers);   // the split, or your wallet
+ * const extensions = aff.extensions;               // declares your app code `a`
+ *
+ * // ── the payout side ──
+ * const { calls, balanceUnits } = await aff.release("bc_alice");
+ * ```
+ *
+ * Everything here is enforced by the same two Base-mainnet contracts the Python
+ * kit uses — the Builder Codes registry and the 0xSplits PushSplitFactory — so a
+ * TS seller and a Python seller resolve the *same* split address for a given
+ * (seller, builder) pair.
+ *
+ * The only dependency is `viem`. Resolution NEVER throws: a missing, unknown, or
+ * unresolvable code falls back to the seller wallet (unsplit, never a failed
+ * payment).
+ */
+import {
+  createPublicClient,
+  http,
+  encodeFunctionData,
+  BaseError,
+  ContractFunctionRevertedError,
+} from "viem";
+import { base } from "viem/chains";
+import type { Address, Hex, PublicClient } from "viem";
+
+// ── Base mainnet addresses (identical to the Python kit) ─────────────────────
+export const USDC_BASE: Address = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+export const BUILDER_CODES_REGISTRY: Address =
+  "0x000000BC7E6457e610fe52Dcc0ca5b3ce59C8E80";
+/** 0xSplits PushSplitFactory V2.2 on Base — confirmed by the Splits team. */
+export const SPLITS_PUSH_FACTORY: Address =
+  "0x8E8eB0cC6AE34A38B67D5Cf91ACa38f60bc3Ecf4";
+
+export const DEFAULT_BUILDER_SHARE_BPS = 1000; // 10%
+export const BPS_DENOM = 10000;
+/** A PushSplit keeps 1 base unit warm; only balance-1 is ever distributable. */
+export const SPLITS_RETAINED_UNITS = 1n;
+
+const ZERO_ADDRESS: Address = "0x0000000000000000000000000000000000000000";
+const ZERO_SALT: Hex = ("0x" + "00".repeat(32)) as Hex;
+const PUBLIC_BASE_RPC = "https://mainnet.base.org";
+
+/** Every builder code (a / w / s) is 1-32 lowercase letters, digits, `_`. */
+export const BUILDER_CODE_PATTERN = "^[a-z0-9_]{1,32}$";
+const BUILDER_CODE_RE = /^[a-z0-9_]{1,32}$/;
+
+/** JSON Schema for the ERC-8021 Schema 2 fields (mirrors builder_code.py). */
+const BUILDER_CODE_SCHEMA = {
+  type: "object",
+  properties: {
+    a: { type: "string", pattern: BUILDER_CODE_PATTERN },
+    w: { type: "string", pattern: BUILDER_CODE_PATTERN },
+    s: { type: "array", items: { type: "string", pattern: BUILDER_CODE_PATTERN } },
+  },
+  additionalProperties: false,
+} as const;
+
+// ── ABIs (only the functions this kit calls) ─────────────────────────────────
+const SPLIT_STRUCT = {
+  name: "split",
+  type: "tuple",
+  components: [
+    { name: "recipients", type: "address[]" },
+    { name: "allocations", type: "uint256[]" },
+    { name: "totalAllocation", type: "uint256" },
+    { name: "distributionIncentive", type: "uint16" },
+  ],
+} as const;
+
+const FACTORY_ABI = [
+  {
+    name: "isDeployed",
+    type: "function",
+    stateMutability: "view",
+    inputs: [SPLIT_STRUCT, { name: "owner", type: "address" }, { name: "salt", type: "bytes32" }],
+    outputs: [{ type: "address" }, { type: "bool" }],
+  },
+  {
+    name: "createSplitDeterministic",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      SPLIT_STRUCT,
+      { name: "owner", type: "address" },
+      { name: "creator", type: "address" },
+      { name: "salt", type: "bytes32" },
+    ],
+    outputs: [{ type: "address" }],
+  },
+] as const;
+
+const SPLIT_ABI = [
+  {
+    name: "distribute",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [SPLIT_STRUCT, { name: "token", type: "address" }, { name: "distributor", type: "address" }],
+    outputs: [],
+  },
+] as const;
+
+const REGISTRY_ABI = [
+  {
+    name: "payoutAddress",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ type: "uint256" }],
+    outputs: [{ type: "address" }],
+  },
+] as const;
+
+const ERC20_ABI = [
+  {
+    name: "balanceOf",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ type: "address" }],
+    outputs: [{ type: "uint256" }],
+  },
+] as const;
+
+// ── plain-data types ─────────────────────────────────────────────────────────
+export interface SplitPlan {
+  sellerPayout: Address;
+  builderCode: string | null;
+  builderPayout: Address | null;
+  builderShareBps: number;
+  /** `[address, allocationBps][]`, summing to BPS_DENOM — the PushSplit's shape. */
+  recipients: Array<[Address, number]>;
+  hasBuilder: boolean;
+}
+
+export interface PayTo {
+  /** The address to advertise as the route's `payTo`. */
+  address: Address;
+  /** False when there was no/unknown/unresolvable code (i.e. `address` is the seller). */
+  attributed: boolean;
+  splitDeployed: boolean;
+  plan: SplitPlan;
+  /** Set only when a lookup *failed* (vs. finding no builder) — watch for RPC 429s. */
+  error?: string;
+}
+
+export interface DistributeCall {
+  step: "deploy_split" | "distribute";
+  target: Address;
+  summary: string;
+  data: Hex;
+}
+
+export interface AffiliationOptions {
+  /** Your app / resource-server code — the `a` you declare on the route. */
+  appCode: string;
+  /** Where your remainder (and every unattributed payment) is paid. */
+  sellerPayout: Address;
+  /** Builder cut in basis points (1000 = 10%). Default DEFAULT_BUILDER_SHARE_BPS. */
+  builderShareBps?: number;
+  /** Base RPC. Ignored if `client` is supplied. Defaults to the (rate-limited) public RPC. */
+  rpcUrl?: string;
+  /** Inject a viem PublicClient (custom transport, tests, a shared client). */
+  client?: PublicClient;
+}
+
+// ── pure helpers (no network) ─────────────────────────────────────────────────
+
+/** Builder code → ERC-721 token id: the code's ASCII bytes as a big-endian int. */
+export function toTokenId(code: string): bigint {
+  if (!BUILDER_CODE_RE.test(code)) {
+    throw new Error(`invalid builder code ${JSON.stringify(code)} (must match ${BUILDER_CODE_PATTERN})`);
+  }
+  let hex = "";
+  for (let i = 0; i < code.length; i++) hex += code.charCodeAt(i).toString(16).padStart(2, "0");
+  return BigInt("0x" + hex);
+}
+
+/** First valid code from a possibly comma-joined `s` (v1 pays one builder). */
+export function primaryCode(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  for (const part of String(raw).split(",")) {
+    const c = part.trim();
+    if (BUILDER_CODE_RE.test(c)) return c;
+  }
+  return null;
+}
+
+/** Build a split plan from already-resolved addresses. */
+export function buildSplitPlan(
+  sellerPayout: Address,
+  builderPayout: Address | null,
+  builderCode: string | null,
+  builderShareBps: number,
+): SplitPlan {
+  if (!sellerPayout) throw new Error("sellerPayout is required");
+  if (!(builderShareBps >= 0 && builderShareBps <= BPS_DENOM)) {
+    throw new RangeError(`builderShareBps must be 0..${BPS_DENOM}`);
+  }
+  if (builderPayout && builderShareBps > 0) {
+    return {
+      sellerPayout,
+      builderCode,
+      builderPayout,
+      builderShareBps,
+      recipients: [
+        [builderPayout, builderShareBps],
+        [sellerPayout, BPS_DENOM - builderShareBps],
+      ],
+      hasBuilder: true,
+    };
+  }
+  return {
+    sellerPayout,
+    builderCode,
+    builderPayout: null,
+    builderShareBps,
+    recipients: [[sellerPayout, BPS_DENOM]],
+    hasBuilder: false,
+  };
+}
+
+/** What each recipient actually receives on-chain (mirrors 0xSplits exactly). */
+export function amountsUnits(plan: SplitPlan, priceUnits: bigint): Map<Address, bigint> {
+  if (!plan.hasBuilder) return new Map([[plan.sellerPayout, priceUnits]]);
+  const distributable = priceUnits > SPLITS_RETAINED_UNITS ? priceUnits - SPLITS_RETAINED_UNITS : 0n;
+  const out = new Map<Address, bigint>();
+  for (const [addr, bps] of plan.recipients) {
+    out.set(addr, (distributable * BigInt(bps)) / BigInt(BPS_DENOM));
+  }
+  return out;
+}
+
+function splitStruct(plan: SplitPlan) {
+  return {
+    recipients: plan.recipients.map((r) => r[0]),
+    allocations: plan.recipients.map((r) => BigInt(r[1])),
+    totalAllocation: BigInt(BPS_DENOM),
+    distributionIncentive: 0,
+  } as const;
+}
+
+/** Calldata for factory.createSplitDeterministic (the deploy leg). */
+export function createSplitCalldata(plan: SplitPlan): Hex {
+  return encodeFunctionData({
+    abi: FACTORY_ABI,
+    functionName: "createSplitDeterministic",
+    args: [splitStruct(plan), ZERO_ADDRESS, ZERO_ADDRESS, ZERO_SALT],
+  });
+}
+
+/** Calldata for split.distribute(split, USDC, distributor). */
+export function distributeCalldata(plan: SplitPlan, distributor: Address = ZERO_ADDRESS): Hex {
+  return encodeFunctionData({
+    abi: SPLIT_ABI,
+    functionName: "distribute",
+    args: [splitStruct(plan), USDC_BASE, distributor],
+  });
+}
+
+/** Calldata for factory.isDeployed(split, owner=0, salt=0) — the address read. */
+export function isDeployedCalldata(plan: SplitPlan): Hex {
+  return encodeFunctionData({
+    abi: FACTORY_ABI,
+    functionName: "isDeployed",
+    args: [splitStruct(plan), ZERO_ADDRESS, ZERO_SALT],
+  });
+}
+
+/** True for a contract revert / empty-return (unregistered), false for a
+ *  transport/network failure (which must surface as an error, not "no builder"). */
+function isUnregistered(err: unknown): boolean {
+  if (err instanceof BaseError) {
+    if (err.walk((e) => e instanceof ContractFunctionRevertedError)) return true;
+    const inner = err.walk();
+    const msg = `${err.shortMessage ?? ""} ${inner instanceof Error ? inner.message : ""}`;
+    if (/reverted|zero data|returned no data/i.test(msg)) return true;
+  }
+  return false;
+}
+
+// ── the facade ─────────────────────────────────────────────────────────────
+
+export class Affiliation {
+  /** The request header a buyer's client sets to name its builder. */
+  static readonly HEADER = "X-Builder-Code";
+
+  readonly appCode: string;
+  readonly sellerPayout: Address;
+  readonly builderShareBps: number;
+  private readonly client: PublicClient;
+  private readonly cache = new Map<string, PayTo>();
+  private _extensions?: Record<string, unknown>;
+
+  constructor(opts: AffiliationOptions) {
+    if (!opts.appCode) throw new Error("appCode is required (your `a` code)");
+    if (!opts.sellerPayout) throw new Error("sellerPayout is required");
+    this.appCode = opts.appCode;
+    this.sellerPayout = opts.sellerPayout;
+    this.builderShareBps = opts.builderShareBps ?? DEFAULT_BUILDER_SHARE_BPS;
+    this.client =
+      opts.client ??
+      (createPublicClient({ chain: base, transport: http(opts.rpcUrl ?? PUBLIC_BASE_RPC) }) as PublicClient);
+  }
+
+  // ── request path ───────────────────────────────────────────────────────────
+
+  /** The route `extensions` that declare your app code `a`. */
+  get extensions(): Record<string, unknown> {
+    if (!this._extensions) {
+      if (!BUILDER_CODE_RE.test(this.appCode)) {
+        throw new Error(`app code ${JSON.stringify(this.appCode)} must match ${BUILDER_CODE_PATTERN}`);
+      }
+      this._extensions = {
+        "builder-code": { info: { a: this.appCode }, schema: BUILDER_CODE_SCHEMA },
+      };
+    }
+    return this._extensions;
+  }
+
+  /** Pull a normalized builder code out of a headers object (Headers/Map/Record). */
+  codeFromHeaders(headers: unknown): string | null {
+    return primaryCode(getHeader(headers, Affiliation.HEADER));
+  }
+
+  /** The `payTo` address for a request — the split, or the seller wallet. Never throws. */
+  async payToFor(source: string | null | undefined | Headers | Record<string, unknown> | Map<string, unknown>): Promise<Address> {
+    return (await this.resolve(source)).address;
+  }
+
+  /** Full PayTo (address + why) for a request. Never throws. */
+  async resolve(
+    source: string | null | undefined | Headers | Record<string, unknown> | Map<string, unknown>,
+  ): Promise<PayTo> {
+    const code =
+      source == null || typeof source === "string" ? primaryCode(source ?? null) : this.codeFromHeaders(source);
+
+    if (!code) {
+      return {
+        address: this.sellerPayout,
+        attributed: false,
+        splitDeployed: false,
+        plan: buildSplitPlan(this.sellerPayout, null, null, this.builderShareBps),
+      };
+    }
+
+    const key = `${code}|${this.builderShareBps}`;
+    const cached = this.cache.get(key);
+    if (cached) return cached;
+
+    try {
+      const payout = await this.payoutOf(code);
+      const plan = buildSplitPlan(this.sellerPayout, payout, code, this.builderShareBps);
+      if (!plan.hasBuilder) {
+        const pt: PayTo = { address: this.sellerPayout, attributed: false, splitDeployed: false, plan };
+        this.cache.set(key, pt);
+        return pt;
+      }
+      const [address, deployed] = await this.predictSplitAddress(plan);
+      const pt: PayTo = { address, attributed: true, splitDeployed: deployed, plan };
+      this.cache.set(key, pt);
+      return pt;
+    } catch (err) {
+      // Deliberately NOT cached — transient (RPC 429s); a cached failure would
+      // strand that builder for the process lifetime.
+      return {
+        address: this.sellerPayout,
+        attributed: false,
+        splitDeployed: false,
+        plan: buildSplitPlan(this.sellerPayout, null, code, this.builderShareBps),
+        error: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
+      };
+    }
+  }
+
+  /** Drop the memoized code→split-address cache (after a share change, or a retry). */
+  clearCache(): void {
+    this.cache.clear();
+  }
+
+  // ── payout path ────────────────────────────────────────────────────────────
+
+  /** USDC base units currently sitting in this builder's split (0n if none). */
+  async balance(code: string): Promise<bigint> {
+    const pt = await this.resolve(code);
+    if (!pt.attributed) return 0n;
+    return this.splitBalance(pt.address);
+  }
+
+  /** Build the release calls + live balance for one builder's split. */
+  async release(code: string, opts?: { distributor?: Address }): Promise<{ calls: DistributeCall[]; balanceUnits: bigint }> {
+    const pt = await this.resolve(code);
+    if (!pt.plan.hasBuilder) return { calls: [], balanceUnits: 0n };
+    const balanceUnits = await this.splitBalance(pt.address);
+    const calls = this.distributeCalls(pt.plan, pt.address, pt.splitDeployed, opts?.distributor);
+    return { calls, balanceUnits };
+  }
+
+  /** The calls to release a funded pair (deploy skipped once deployed). */
+  distributeCalls(plan: SplitPlan, splitAddress: Address, deployed: boolean, distributor?: Address): DistributeCall[] {
+    if (!plan.hasBuilder) return [];
+    const calls: DistributeCall[] = [];
+    if (!deployed) {
+      calls.push({
+        step: "deploy_split",
+        target: SPLITS_PUSH_FACTORY,
+        summary: `deploy the per-pair PushSplit at ${splitAddress} (first use of this pair; permissionless)`,
+        data: createSplitCalldata(plan),
+      });
+    }
+    const recips = plan.recipients.map(([a, bps]) => `${a}:${bps}bps`).join(", ");
+    calls.push({
+      step: "distribute",
+      target: splitAddress,
+      summary: `distribute the split's USDC balance → [${recips}] (${plan.builderShareBps}bps to ${plan.builderCode})`,
+      data: distributeCalldata(plan, distributor ?? ZERO_ADDRESS),
+    });
+    return calls;
+  }
+
+  // ── on-chain reads ─────────────────────────────────────────────────────────
+
+  /** code → registered payout address (null when unregistered). Rethrows on network error. */
+  async payoutOf(code: string): Promise<Address | null> {
+    try {
+      const addr = (await this.client.readContract({
+        address: BUILDER_CODES_REGISTRY,
+        abi: REGISTRY_ABI,
+        functionName: "payoutAddress",
+        args: [toTokenId(code)],
+      })) as Address;
+      return BigInt(addr) === 0n ? null : addr;
+    } catch (err) {
+      if (isUnregistered(err)) return null;
+      throw err;
+    }
+  }
+
+  /** The pair's counterfactual PushSplit address + whether it's deployed yet. */
+  async predictSplitAddress(plan: SplitPlan): Promise<[Address, boolean]> {
+    const res = (await this.client.readContract({
+      address: SPLITS_PUSH_FACTORY,
+      abi: FACTORY_ABI,
+      functionName: "isDeployed",
+      args: [splitStruct(plan), ZERO_ADDRESS, ZERO_SALT],
+    })) as readonly [Address, boolean];
+    return [res[0], res[1]];
+  }
+
+  /** USDC balance sitting in the split right now (base units). */
+  async splitBalance(splitAddress: Address): Promise<bigint> {
+    return (await this.client.readContract({
+      address: USDC_BASE,
+      abi: ERC20_ABI,
+      functionName: "balanceOf",
+      args: [splitAddress],
+    })) as bigint;
+  }
+}
+
+/** Read a header case-insensitively from Headers / Map / plain object. */
+function getHeader(headers: unknown, name: string): string | null {
+  if (!headers) return null;
+  const h = headers as { get?: (k: string) => unknown };
+  if (typeof h.get === "function") {
+    const v = h.get(name) ?? h.get(name.toLowerCase());
+    return v == null ? null : String(v);
+  }
+  const lower = name.toLowerCase();
+  for (const [k, v] of Object.entries(headers as Record<string, unknown>)) {
+    if (k.toLowerCase() === lower) return v == null ? null : String(v);
+  }
+  return null;
+}
