@@ -2,7 +2,7 @@
 
 This is the alternative to hitting a raw Base RPC and hand-parsing calldata: CDP
 already decodes builder-code attribution into queryable tables, so you can just
-ask SQL for it. See backfill_sql.py for the affiliation use, and queries.sql for
+ask SQL for it. See monitor.py for the affiliation use, and queries.sql for
 copy-paste queries you can run right now in the no-auth SQL Playground.
 
   Endpoint : POST https://api.cdp.coinbase.com/platform/v2/data/query/run
@@ -67,7 +67,7 @@ def run_query(sql: str, *, max_age_ms: int = 5000, timeout: float = 35.0) -> lis
     """Run a read-only SQL query and return the rows (the ``result`` array).
 
     ``max_age_ms`` lets the API serve a cached result when an identical query ran
-    within that window (up to 900_000ms / 15m) — cheaper for repeated backfills.
+    within that window (up to 900_000ms / 15m) — cheaper for repeated scans (monitor.py).
     """
     resp = requests.post(
         SQL_API_URL,

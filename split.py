@@ -1,19 +1,14 @@
-"""Compute the on-chain split for one settled payment — the ENFORCED payout core.
+"""The split plan for one builder-attributed payment — the ENFORCED payout core.
 
-Given the buyer's referer code ``s`` (captured off the payment) and the price,
-this resolves *who* to pay and produces the *split plan*: the recipient set +
-basis-point allocations that a per-(seller, builder) 0xSplits PushSplit encodes.
+Given a builder code and the price, this resolves *who* to pay and produces the
+*split plan*: the recipient set + basis-point allocations (builder cut + seller
+remainder) that a per-(seller, builder) 0xSplits PushSplit encodes.
 
-This is the counterpart to ``tracking.compute_payouts``:
-
-  * ``compute_payouts`` — the OFF-CHAIN ledger: "who do I owe, I'll pay later."
-  * ``split.py`` + ``settler.py`` — the ON-CHAIN split: "carve the builder's cut
-    at settlement, automatically." Pick one per route (see INTEGRATION.md).
-
-The builder is identified by the payment-time ``s`` code, so the split is decided
-at settlement, not when the 402 goes out — which is exactly why a settler runs it
-(see settler.py). Dependency-light: address resolution reuses ``resolver`` (only
-needs ``requests``); this module itself is pure arithmetic + dataclasses.
+It's the pure-arithmetic half of the kit's enforced payout: ``push_split.py``
+turns a plan into on-chain calldata, and ``payto.py`` sets the route's ``payTo``
+to the plan's split so the CDP facilitator settles straight into it. Address
+resolution reuses ``resolver`` (only needs ``requests``); this module itself is
+pure arithmetic + dataclasses, so the payout math is trivially testable.
 """
 from __future__ import annotations
 

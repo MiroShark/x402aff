@@ -1,0 +1,15 @@
+# Never bake the secret into the image (Railway injects env vars at runtime).
+.env
+.env.*
+
+# Foundry deps/artifacts — huge, irrelevant to the server.
+fork-test/lib/
+fork-test/out/
+fork-test/cache/
+
+# Python + VCS cruft.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.git/
+*.db

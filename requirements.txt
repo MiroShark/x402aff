@@ -2,10 +2,7 @@
 requests>=2.28
 cbor2>=5.4
 
-# Server example (declare + capture + settle observer)
-flask>=2.2
-
-# Optional: CDP SQL API path (backfill_sql.py) — mints the Bearer JWT
+# Optional: CDP SQL API path (monitor.py) — mints the Bearer JWT
 # cdp-sdk>=1.0
 
 # Dev
