@@ -34,6 +34,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from fastapi import FastAPI  # noqa: E402
+from fastapi.responses import FileResponse  # noqa: E402
 from cdp.x402 import create_facilitator_config  # noqa: E402
 from x402.http import (  # noqa: E402
     CreateHeadersAuthProvider,
@@ -112,6 +113,16 @@ app = FastAPI(title="x402 affiliation kit — live test endpoint")
 app.add_middleware(PaymentMiddlewareASGI, routes=routes, server=server)
 
 
+_TRY_HTML = os.path.join(os.path.dirname(os.path.abspath(__file__)), "try.html")
+
+
+@app.get("/try")
+async def try_page() -> FileResponse:
+    """Self-contained browser 'try it' page — connect a wallet and pay live.
+    Same-origin with /run, so no CORS is needed."""
+    return FileResponse(_TRY_HTML, media_type="text/html")
+
+
 @app.post("/run")
 async def run() -> dict:
     """The 'paid work'. Only reached after a verified, settled payment."""
@@ -124,6 +135,7 @@ async def health() -> dict:
     warm = payto.payto_for_request(WARM_CODE, seller_payout=SELLER_PAYOUT)
     return {
         "status": "up",
+        "try_it": "/try",
         "network": NETWORK,
         "app_code": APP_CODE,
         "seller_payout": SELLER_PAYOUT,

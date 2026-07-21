@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>x402 affiliation — try it</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: #0b0d10; color: #e6e9ef;
+    font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    display: flex; justify-content: center; padding: 32px 16px;
+  }
+  main { width: 100%; max-width: 620px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: #9aa4b2; margin: 0 0 24px; font-size: 13px; }
+  .card { background: #12161c; border: 1px solid #232a34; border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+  .row { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; font-size: 13px; }
+  .row .k { color: #9aa4b2; } .row .v { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; text-align: right; }
+  label { display: block; font-size: 12px; color: #9aa4b2; margin: 0 0 6px; }
+  input {
+    width: 100%; background: #0b0d10; border: 1px solid #2b333f; color: #e6e9ef;
+    border-radius: 8px; padding: 10px 12px; font-family: ui-monospace, monospace; font-size: 14px;
+  }
+  button {
+    appearance: none; border: 0; border-radius: 9px; padding: 12px 16px; font-size: 14px; font-weight: 600;
+    cursor: pointer; width: 100%; margin-top: 12px; transition: opacity .15s;
+  }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .primary { background: #3b82f6; color: #fff; }
+  .ghost { background: #1c2530; color: #cdd5df; }
+  #log { font-family: ui-monospace, monospace; font-size: 12.5px; white-space: pre-wrap; word-break: break-word;
+    background: #0b0d10; border: 1px solid #232a34; border-radius: 8px; padding: 12px; min-height: 88px; margin-top: 12px; }
+  a { color: #6ea8fe; }
+  .ok { color: #4ade80; } .err { color: #f87171; } .muted { color: #9aa4b2; }
+  .split { font-size: 11px; color: #9aa4b2; margin-top: 10px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>x402 affiliation — try it</h1>
+  <p class="sub">Pay this x402 endpoint $0.02 on Base and watch the affiliate cut route to a
+  per-pair <a href="https://splits.org" target="_blank" rel="noreferrer">0xSplits</a> split — 10% to the builder, 90% to the seller. Gas sponsored by CDP.</p>
+
+  <div class="card" id="cfg">
+    <div class="row"><span class="k">endpoint</span><span class="v" id="c-ep">POST /run</span></div>
+    <div class="row"><span class="k">price</span><span class="v" id="c-price">…</span></div>
+    <div class="row"><span class="k">seller (a)</span><span class="v" id="c-seller">…</span></div>
+    <div class="row"><span class="k">network</span><span class="v">Base · eip155:8453</span></div>
+  </div>
+
+  <div class="card">
+    <label for="code">Builder code to attribute (earns 10% as <code>s</code>)</label>
+    <input id="code" value="leap_wallet" spellcheck="false" autocapitalize="off" />
+    <div class="split muted" id="splitline">payTo (the split) resolves after you connect…</div>
+    <button class="ghost" id="connect">Connect wallet</button>
+    <button class="primary" id="pay" disabled>Pay $0.02 &amp; run</button>
+  </div>
+
+  <div id="log" class="muted">Ready. You'll need a Base wallet (MetaMask/Rabby) holding ≥ $0.02 USDC.</div>
+</main>
+
+<script type="module">
+import { createWalletClient, custom } from "https://esm.sh/viem@2.52.0";
+import { base } from "https://esm.sh/viem@2.52.0/chains";
+import { x402Client, wrapFetchWithPayment } from "https://esm.sh/@x402/fetch@2.15.0";
+import { registerExactEvmScheme } from "https://esm.sh/@x402/evm@2.15.0/exact/client";
+import { BuilderCodeClientExtension, BUILDER_CODE_PATTERN } from "https://esm.sh/@x402/extensions@2.15.0/builder-code";
+import { decodePaymentResponseHeader } from "https://esm.sh/@x402/core@2.15.0/http";
+
+const BASE_CAIP2 = "eip155:8453";
+const BASE_HEX = "0x2105";
+const $ = (id) => document.getElementById(id);
+const logEl = $("log");
+let account = null;
+
+function log(msg, cls) {
+  logEl.className = cls || "";
+  logEl.textContent = msg;
+}
+function append(msg) { logEl.textContent += "\n" + msg; }
+
+// Show endpoint config + the resolved split for the entered code.
+async function loadConfig() {
+  try {
+    const h = await (await fetch("/")).json();
+    $("c-price").textContent = h.price;
+    $("c-seller").textContent = h.app_code + "  →  " + shorten(h.seller_payout);
+    refreshSplit();
+  } catch (e) { /* health optional */ }
+}
+function shorten(a){ return a ? a.slice(0,6)+"…"+a.slice(-4) : a; }
+
+// Ask the endpoint (unpaid 402) what payTo it would use for this code.
+async function refreshSplit() {
+  const code = $("code").value.trim();
+  if (!code) { $("splitline").textContent = "no code → pays the seller directly (no split)"; return; }
+  try {
+    const r = await fetch("/run", { method:"POST", headers:{ "X-Builder-Code": code } });
+    const pr = r.headers.get("payment-required");
+    if (!pr) return;
+    const j = JSON.parse(atob(pr.replace(/-/g,"+").replace(/_/g,"/")));
+    const payTo = j.accepts?.[0]?.payTo;
+    $("splitline").innerHTML = 'payTo → <a href="https://basescan.org/address/'+payTo+'" target="_blank" rel="noreferrer">'+payTo+'</a>';
+  } catch (e) { /* ignore */ }
+}
+$("code").addEventListener("input", debounce(refreshSplit, 400));
+function debounce(fn,ms){let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms);};}
+
+$("connect").onclick = async () => {
+  if (!window.ethereum) { log("No injected wallet found. Install MetaMask or Rabby.", "err"); return; }
+  try {
+    const [addr] = await window.ethereum.request({ method: "eth_requestAccounts" });
+    account = addr;
+    // Ensure Base.
+    try {
+      await window.ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: BASE_HEX }] });
+    } catch (e) {
+      if (e.code === 4902) {
+        await window.ethereum.request({ method: "wallet_addEthereumChain", params: [{
+          chainId: BASE_HEX, chainName: "Base", nativeCurrency: { name:"Ether", symbol:"ETH", decimals:18 },
+          rpcUrls: ["https://mainnet.base.org"], blockExplorerUrls: ["https://basescan.org"] }] });
+      }
+    }
+    $("connect").textContent = "Connected · " + shorten(addr);
+    $("pay").disabled = false;
+    log("Connected " + addr + "\nOn Base. Ready to pay.", "ok");
+  } catch (e) { log("Connect failed: " + (e.message || e), "err"); }
+};
+
+$("pay").onclick = async () => {
+  const code = $("code").value.trim();
+  if (code && !BUILDER_CODE_PATTERN.test(code)) { log("Invalid builder code (must match ^[a-z0-9_]{1,32}$).", "err"); return; }
+  $("pay").disabled = true;
+  log("Building x402 client…");
+  try {
+    const walletClient = createWalletClient({ account, chain: base, transport: custom(window.ethereum) });
+    const signer = {
+      address: account,
+      signTypedData: (msg) => walletClient.signTypedData({ account, ...msg }),
+    };
+    const client = new x402Client();
+    registerExactEvmScheme(client, { signer, networks: [BASE_CAIP2], schemeOptions: { rpcUrl: "https://mainnet.base.org" } });
+    if (code) client.registerExtension(new BuilderCodeClientExtension(code)); // s, on-chain
+
+    const fetchWithPay = wrapFetchWithPayment(fetch.bind(globalThis), client);
+    append("Requesting 402 challenge…");
+    // The X-Builder-Code header routes payTo → the per-pair split at 402 time.
+    const res = await fetchWithPay("/run", {
+      method: "POST",
+      headers: { "content-type": "application/json", ...(code ? { "X-Builder-Code": code } : {}) },
+      body: "{}",
+    });
+    append("Sign prompt cleared. HTTP " + res.status);
+    const body = await res.json().catch(() => ({}));
+
+    let tx = null;
+    const raw = res.headers.get("payment-response");
+    if (raw) { try { const s = decodePaymentResponseHeader(raw); if (s?.success) tx = s.transaction; } catch {} }
+
+    if (res.ok) {
+      let out = "✅ Paid & ran.\n" + JSON.stringify(body);
+      if (tx) out += "\n\nsettle tx: " + tx + "\nhttps://basescan.org/tx/" + tx;
+      out += "\n\nFunds are now in the split. Run distribute.py (or the cast\ncommands in RUNBOOK) to push 10% to the builder, 90% to the seller.";
+      log(out, "ok");
+    } else {
+      log("Payment did not complete (HTTP " + res.status + "):\n" + JSON.stringify(body), "err");
+      $("pay").disabled = false;
+    }
+  } catch (e) {
+    log("Failed: " + (e?.message || e), "err");
+    $("pay").disabled = false;
+  }
+};
+
+loadConfig();
+</script>
+</body>
+</html>
