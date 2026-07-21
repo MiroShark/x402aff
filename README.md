@@ -81,7 +81,7 @@ python demo.py                            # the whole loop (off-chain + on-chain
 python settler.py                         # print the atomic settle multicall for one payment
 pytest -q                                 # 57 tests (declare/decode + split math + Splits calldata)
 
-cd fork-test && forge test                # 6 tests against a real Base mainnet fork (~4s, needs foundry)
+cd fork-test && forge test                # 11 tests against a real Base mainnet fork (needs foundry)
 ```
 
 > **Wiring the settler:** set your route's `payTo` to `X402_SETTLER_ACCOUNT`, not
@@ -103,7 +103,7 @@ cd fork-test && forge test                # 6 tests against a real Base mainnet 
 | **`settler.py`** | Reference **settler**: read `s` at settlement → resolve → one atomic tx (pull the buyer's USDC → fund the per-pair PushSplit → deploy it if new → distribute). Emits ready-to-submit calldata against the confirmed Base PushSplitFactory; config-driven, so any x402 seller can reuse it. See `INTEGRATION.md`. |
 | **`buyer_client.py`** | Buyer side: the one client extension a builder registers to attach their code and earn. |
 | **`demo.py`** | End-to-end, in-memory, no network. |
-| **`fork-test/`** | Foundry tests running the settle legs against **live** Base USDC + PushSplitFactory on a mainnet fork. Pins why `payTo` must be the settler, and the exact payout math. |
+| **`fork-test/`** | Foundry tests running the settle legs against **live** Base USDC + PushSplitFactory on a mainnet fork. Pins why `payTo` must be the settler, the exact payout math, and the 7702 delegation (incl. a failing leg rolling back the pull). |
 
 ---
 
@@ -290,11 +290,15 @@ client.register_extension(BuilderCodeClientExtension("bc_yourcode"))
   actually sending the USDC share is a separate job you run against
   `compute_payouts()`.
 - **The settler builds calldata; it doesn't sign or broadcast.** There's no key
-  handling anywhere in this repo. `settler.py` emits the target/calldata pairs —
-  wiring them to a funded 7702 account (nonce management, gas, liveness) is the
-  remaining integration step, and the one part `fork-test/` doesn't exercise (it
-  `vm.prank`s the settler rather than authorizing a real one). Do a fork test of
-  your own wiring before any mainnet money moves.
+  handling anywhere in this repo. `settler.py` emits the target/calldata pairs;
+  `fork-test/Delegation7702.t.sol` runs them through a real signed 7702
+  delegation. What's left is *broadcasting* — a funded settler account, nonce
+  management, gas, liveness. Do a run of your own wiring before any mainnet money
+  moves.
+- **Don't ship on the public RPC.** `resolver.py` defaults to
+  `https://mainnet.base.org`, which starts returning `429` after a few calls in a
+  row. Set `X402_BASE_RPC` to a paid endpoint — a rate-limited resolve means a
+  builder silently doesn't get paid.
 
 ## References
 
