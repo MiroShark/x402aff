@@ -72,38 +72,37 @@ real USDC, no server involved.
 
 ---
 
-## Stage 2 — one real payment through your live endpoint (~$0.05 + gas)
+## Stage 2 — one real payment through the live endpoint (~$0.02 + $0)
 
-Now prove CDP itself settles into the split and writes attribution.
+The endpoint is already deployed and wired (see `test_endpoint/`): it declares
+`a = bc_c12702g2`, reads `X-Builder-Code`, and sets `payTo` = the per-pair split
+via `payto.payto_for_request`. Live at:
 
-1. **Wire request-time `payTo` into your 402 handler.** Where you currently set a
-   fixed `payTo`, resolve it per request instead:
-   ```python
-   import payto
+    https://x402-endpoint-production.up.railway.app
 
-   code = payto.builder_code_from_headers(request.headers)   # X-Builder-Code
-   pt = payto.payto_for_request(code)                         # never raises
-   route_config.pay_to = pt.address                           # split, or your wallet
-   if pt.error:
-       log.warning("payTo resolve failed, unsplit: %s", pt.error)
+Verified: `X-Builder-Code: leap_wallet` → `payTo = 0x3773…2e38` (the split), $0.02
+USDC on `eip155:8453`; no header → `payTo` = the seller wallet.
+
+1. **Pay it once** with a funded Base wallet (holds ≥ $0.02 USDC; CDP sponsors
+   gas, so no ETH needed):
+   ```bash
+   pip install eth-account
+   export BUYER_PRIVATE_KEY=0x...        # YOUR funded Base wallet
+   export BUILDER_CODE=leap_wallet
+   python3 test_endpoint/buyer.py
    ```
-   Keep `declare_builder_code(a)` — identity still matters. No-header requests get
-   your normal wallet, so **existing buyers are unaffected**.
+   `buyer.py` sends the header, attaches `s = leap_wallet` inside the payment, and
+   prints the **settle tx hash** on success.
 
-2. **Make one paid request that sends the header.** From an x402 client, set
-   `X-Builder-Code: leap_wallet` (or your test code) on the initial request and
-   pay the (small) price. The buyer also attaches `s` as usual via
-   `buyer_client.BuilderCodeClientExtension` — belt and suspenders.
+2. **Confirm CDP settled into the split & wrote attribution.** With the tx hash:
+   - Paste it into <https://buildercode-checker.vercel.app/> → you should see
+     `a = bc_c12702g2`, the facilitator's `w`, and `s = leap_wallet`. **This is
+     the proof CDP still writes attribution on this path.**
+   - Check the split's balance rose by $0.02 (`distribute.split_balance_units`).
 
-3. **Confirm CDP settled into the split.** Grab the settle tx hash (from your
-   `SettleTxCaptureMiddleware` or the `X-PAYMENT-RESPONSE` header) and:
-   - Paste it into <https://buildercode-checker.vercel.app/> → you should see your
-     `a`, the facilitator's `w`, and `s = leap_wallet`. **This is the proof CDP
-     still writes attribution on this path.**
-   - Check the split's balance rose by the price (`distribute.split_balance_units`).
-
-4. **Distribute** exactly as Stage 1, step 3 — deploy if first use, then
-   distribute. Builder gets 10%, you get 90%.
+3. **Distribute** exactly as Stage 1, step 3 — deploy if first use, then
+   distribute. `leap_wallet` (`0xa06c…54c8`) gets 10%, the seller (`0x95dd…71cc`)
+   gets 90%.
 
 ✅ **Stage 2 proves:** the real CDP facilitator, with sponsored gas, settles into
 your per-pair split AND writes `a`/`s`/`w` — i.e. you get enforced split *and*
