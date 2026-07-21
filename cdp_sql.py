@@ -1,4 +1,4 @@
-"""Thin client for the CDP SQL API — query Coinbase's decoded on-chain tables.
+"""Thin client for the CDP SQL API - query Coinbase's decoded on-chain tables.
 
 This is the alternative to hitting a raw Base RPC and hand-parsing calldata: CDP
 already decodes builder-code attribution into queryable tables, so you can just
@@ -67,7 +67,7 @@ def run_query(sql: str, *, max_age_ms: int = 5000, timeout: float = 35.0) -> lis
     """Run a read-only SQL query and return the rows (the ``result`` array).
 
     ``max_age_ms`` lets the API serve a cached result when an identical query ran
-    within that window (up to 900_000ms / 15m) — cheaper for repeated scans (monitor.py).
+    within that window (up to 900_000ms / 15m) - cheaper for repeated scans (monitor.py).
     """
     resp = requests.post(
         SQL_API_URL,
@@ -85,8 +85,8 @@ def run_query(sql: str, *, max_age_ms: int = 5000, timeout: float = 35.0) -> lis
 def sql_in_list(values) -> str:
     """Render a Python iterable of strings as a ClickHouse IN (...) list.
 
-    Values here are tx hashes (0x + 64 hex) or builder codes ([a-z0-9_]) — both
-    already constrained to safe characters — but we still hard-filter to those
+    Values here are tx hashes (0x + 64 hex) or builder codes ([a-z0-9_]) - both
+    already constrained to safe characters - but we still hard-filter to those
     charsets so nothing but a hash/code can reach the query string.
     """
     import re

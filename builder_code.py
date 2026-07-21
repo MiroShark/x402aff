@@ -1,11 +1,11 @@
-"""Base Builder Code (ERC-8021 Schema 2) helpers for x402 — declare & decode.
+"""Base Builder Code (ERC-8021 Schema 2) helpers for x402 - declare & decode.
 
 This is the one framework-agnostic, reusable piece of the whole affiliation
 system. It does two jobs and has no web framework or database dependency:
 
-  1. declare_builder_code(app_code)  — build the extension dict you attach to
+  1. declare_builder_code(app_code)  - build the extension dict you attach to
      your paid x402 route so every payment is stamped with YOUR app code ("a").
-  2. parse_builder_code_suffix(calldata) — decode the ERC-8021 suffix the
+  2. parse_builder_code_suffix(calldata) - decode the ERC-8021 suffix the
      facilitator appended to a settlement transaction, so you can read back the
      authoritative on-chain codes (most importantly "w", the facilitator wallet
      code, which only exists after settlement).
@@ -73,7 +73,7 @@ def normalize_service_codes(raw: Any) -> str | None:
 
     The buyer's client extension sends ``s`` as a list (one entry per layered
     client), but it can also arrive as a bare string. Returns the valid,
-    de-duplicated codes joined by ``,`` (order preserved), or None when empty —
+    de-duplicated codes joined by ``,`` (order preserved), or None when empty -
     ready to drop in a single TEXT/VARCHAR column. Invalid entries are dropped.
     """
     if raw is None:
@@ -92,7 +92,7 @@ def declare_builder_code(app_code: str) -> dict[str, Any]:
 
     Returns ``{"builder-code": {"info": {"a": <app_code>}, "schema": ...}}``,
     ready to merge into the route config you pass to the x402 middleware. This is
-    all it takes to declare your app code — the facilitator does the rest at
+    all it takes to declare your app code - the facilitator does the rest at
     settlement. Raises ValueError if ``app_code`` is malformed.
     """
     code = (app_code or "").strip()
@@ -110,8 +110,8 @@ def parse_builder_code_suffix(calldata: Any) -> dict[str, Any] | None:
     The reverse of what the facilitator appends at settle time (the Python
     equivalent of TS ``parseBuilderCodeSuffixFromCalldata``). Returns a dict with
     whichever of ``a`` / ``w`` / ``s`` are present, or ``None`` when there is no
-    valid Schema 2 suffix — so it's safe to call on ANY transaction. Use it to
-    read the authoritative on-chain attribution off a settle tx — ``a`` / ``s``
+    valid Schema 2 suffix - so it's safe to call on ANY transaction. Use it to
+    read the authoritative on-chain attribution off a settle tx - ``a`` / ``s``
     and above all ``w`` (the facilitator wallet code), which only exists
     post-settle (as the live-test verification in ``RUNBOOK-live-test.md`` does).
 
@@ -135,7 +135,7 @@ def parse_builder_code_suffix(calldata: Any) -> dict[str, Any] | None:
     if start < 0:
         return None
 
-    # cbor2 is only needed on this decode path — import it lazily so declaring a
+    # cbor2 is only needed on this decode path - import it lazily so declaring a
     # code stays dependency-free.
     try:
         import cbor2

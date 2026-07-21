@@ -1,4 +1,4 @@
-"""One object that is the whole integration — declare, payTo, distribute.
+"""One object that is the whole integration - declare, payTo, distribute.
 
 The kit's pieces (`builder_code`, `payto`, `split`, `push_split`, `distribute`,
 `monitor`) each do one job well, but wiring an x402 route means importing several
@@ -23,7 +23,7 @@ configured object so the integration is a couple of lines.
     calls, balance = aff.release("bc_alice") # deploy (first use) + distribute calldata
 
 ``aff.pay_to`` is a drop-in x402 ``DynamicPayTo`` callback: it pulls the builder
-code off the request, resolves the per-pair split, and — like everything here —
+code off the request, resolves the per-pair split, and - like everything here -
 **never raises**; any failure falls back to the seller wallet (unsplit, never a
 failed payment). The same object accepts a headers mapping or a raw code, so it
 works outside the x402 SDK too.
@@ -64,7 +64,7 @@ class Affiliation:
         ``X402_BUILDER_SHARE_BPS`` / the kit default.
     rpc_url
         Base RPC for the address/balance reads. ``None`` uses ``X402_BASE_RPC`` /
-        the public endpoint (which rate-limits — set a paid one in production).
+        the public endpoint (which rate-limits - set a paid one in production).
     """
 
     #: The request header a buyer's client sets to name its builder.
@@ -117,7 +117,7 @@ class Affiliation:
         return self.resolve(ctx).address
 
     def pay_to_for(self, source=None, *, code: Optional[str] = None) -> str:
-        """Sync ``payTo`` for a request — for stacks where you set it yourself.
+        """Sync ``payTo`` for a request - for stacks where you set it yourself.
 
         ``source`` may be an x402 request context, a headers mapping (Flask/
         Starlette/dict), or a raw code string. Or pass ``code=`` directly.
@@ -127,7 +127,7 @@ class Affiliation:
     def resolve(self, source=None, *, code: Optional[str] = None) -> payto.PayTo:
         """Full ``PayTo`` (address + why) for a request. Never raises.
 
-        Logs a warning if resolution *failed* (vs. simply finding no builder) —
+        Logs a warning if resolution *failed* (vs. simply finding no builder) -
         a spike there means the RPC is rate-limiting and builders are silently
         losing their cut.
         """
@@ -177,7 +177,7 @@ class Affiliation:
     def release(self, code: str, *, distributor: Optional[str] = None):
         """Build the release calls + live balance for one builder's split.
 
-        Returns ``(calls, balance_units)`` — submit each ``(target, data)`` from
+        Returns ``(calls, balance_units)`` - submit each ``(target, data)`` from
         any funded Base account (skip when balance is 0). Permissionless.
         """
         pt = self.resolve(code=code)
@@ -188,7 +188,7 @@ class Affiliation:
     def scan(self, *, days: int = 90):
         """Every builder who paid you and their split's balance (fullest first).
 
-        Needs ``cdp-sdk`` — discovery uses CDP's attribution index (no local
+        Needs ``cdp-sdk`` - discovery uses CDP's attribution index (no local
         ledger). Returns ``monitor.SplitStatus`` rows.
         """
         import monitor  # lazy: only this path needs cdp_sql / cdp-sdk

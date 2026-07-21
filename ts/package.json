@@ -1,7 +1,7 @@
 {
   "name": "@x402-affiliation/kit",
   "version": "0.1.0",
-  "description": "Builder-code affiliation for x402 sellers — the Affiliation facade (TypeScript port of affiliation.py).",
+  "description": "Builder-code affiliation for x402 sellers - the Affiliation facade (TypeScript port of affiliation.py).",
   "type": "module",
   "exports": {
     ".": "./src/affiliation.ts"

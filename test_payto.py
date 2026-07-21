@@ -1,7 +1,7 @@
 """Offline tests for the request-time payTo path (payto.py + distribute.py).
 
 Network-touching bits (resolve, predict_split_address, balanceOf) are monkey-
-patched — these pin the *routing and safety* logic, not on-chain behaviour
+patched - these pin the *routing and safety* logic, not on-chain behaviour
 (that's fork-test/CdpPath.t.sol).
 """
 import distribute

@@ -1,5 +1,5 @@
 /**
- * One object that is the whole integration — declare, payTo, distribute.
+ * One object that is the whole integration - declare, payTo, distribute.
  *
  * A TypeScript port of the kit's Python `Affiliation` facade (affiliation.py),
  * for x402 sellers running the Node / TS reference stack. Same three on-chain
@@ -19,7 +19,7 @@
  * ```
  *
  * Everything here is enforced by the same two Base-mainnet contracts the Python
- * kit uses — the Builder Codes registry and the 0xSplits PushSplitFactory — so a
+ * kit uses - the Builder Codes registry and the 0xSplits PushSplitFactory - so a
  * TS seller and a Python seller resolve the *same* split address for a given
  * (seller, builder) pair.
  *
@@ -41,7 +41,7 @@ import type { Address, Hex, PublicClient } from "viem";
 export const USDC_BASE: Address = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 export const BUILDER_CODES_REGISTRY: Address =
   "0x000000BC7E6457e610fe52Dcc0ca5b3ce59C8E80";
-/** 0xSplits PushSplitFactory V2.2 on Base — confirmed by the Splits team. */
+/** 0xSplits PushSplitFactory V2.2 on Base - confirmed by the Splits team. */
 export const SPLITS_PUSH_FACTORY: Address =
   "0x8E8eB0cC6AE34A38B67D5Cf91ACa38f60bc3Ecf4";
 
@@ -139,7 +139,7 @@ export interface SplitPlan {
   builderCode: string | null;
   builderPayout: Address | null;
   builderShareBps: number;
-  /** `[address, allocationBps][]`, summing to BPS_DENOM — the PushSplit's shape. */
+  /** `[address, allocationBps][]`, summing to BPS_DENOM - the PushSplit's shape. */
   recipients: Array<[Address, number]>;
   hasBuilder: boolean;
 }
@@ -151,7 +151,7 @@ export interface PayTo {
   attributed: boolean;
   splitDeployed: boolean;
   plan: SplitPlan;
-  /** Set only when a lookup *failed* (vs. finding no builder) — watch for RPC 429s. */
+  /** Set only when a lookup *failed* (vs. finding no builder) - watch for RPC 429s. */
   error?: string;
 }
 
@@ -163,7 +163,7 @@ export interface DistributeCall {
 }
 
 export interface AffiliationOptions {
-  /** Your app / resource-server code — the `a` you declare on the route. */
+  /** Your app / resource-server code - the `a` you declare on the route. */
   appCode: string;
   /** Where your remainder (and every unattributed payment) is paid. */
   sellerPayout: Address;
@@ -269,7 +269,7 @@ export function distributeCalldata(plan: SplitPlan, distributor: Address = ZERO_
   });
 }
 
-/** Calldata for factory.isDeployed(split, owner=0, salt=0) — the address read. */
+/** Calldata for factory.isDeployed(split, owner=0, salt=0) - the address read. */
 export function isDeployedCalldata(plan: SplitPlan): Hex {
   return encodeFunctionData({
     abi: FACTORY_ABI,
@@ -334,7 +334,7 @@ export class Affiliation {
     return primaryCode(getHeader(headers, Affiliation.HEADER));
   }
 
-  /** The `payTo` address for a request — the split, or the seller wallet. Never throws. */
+  /** The `payTo` address for a request - the split, or the seller wallet. Never throws. */
   async payToFor(source: string | null | undefined | Headers | Record<string, unknown> | Map<string, unknown>): Promise<Address> {
     return (await this.resolve(source)).address;
   }
@@ -372,7 +372,7 @@ export class Affiliation {
       this.cache.set(key, pt);
       return pt;
     } catch (err) {
-      // Deliberately NOT cached — transient (RPC 429s); a cached failure would
+      // Deliberately NOT cached - transient (RPC 429s); a cached failure would
       // strand that builder for the process lifetime.
       return {
         address: this.sellerPayout,

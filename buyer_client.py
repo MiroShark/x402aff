@@ -10,7 +10,7 @@ Get a code (format ^[a-z0-9_]{1,32}$) at base.dev → Settings → Builder Codes
 then register the payout wallet you want the share sent to.
 
 --------------------------------------------------------------------------------
-Python — the x402 Python SDK has no builder-code module, but its client takes
+Python - the x402 Python SDK has no builder-code module, but its client takes
 generic extensions and the resource server declares the "builder-code" key in
 its 402, so this matching extension fires and tags the code as `s`:
 """
@@ -31,13 +31,13 @@ class BuilderCodeClientExtension:
         return payload.model_copy(update={"extensions": exts})
 
 
-# Usage — on the same x402ClientSync() you registered the payment scheme on:
+# Usage - on the same x402ClientSync() you registered the payment scheme on:
 #
 #   client.register_extension(BuilderCodeClientExtension("bc_yourcode"))
 #   client.fetch("https://api.example.com/run", ...)   # now carries your code
 #
 # --------------------------------------------------------------------------------
-# TypeScript — use the official extension instead (npm install @x402/extensions):
+# TypeScript - use the official extension instead (npm install @x402/extensions):
 #
 #   import { x402Client } from "@x402/fetch";
 #   import { registerExactEvmScheme } from "@x402/evm/exact/client";
@@ -53,5 +53,5 @@ class BuilderCodeClientExtension:
 #
 # --------------------------------------------------------------------------------
 # Verify (after a real Base-mainnet settlement): take the settle tx hash (from the
-# PAYMENT-RESPONSE header) and paste it into buildercode-checker.vercel.app — you
+# PAYMENT-RESPONSE header) and paste it into buildercode-checker.vercel.app - you
 # should see the resource server's `a`, the CDP facilitator's `w`, and your `s`.

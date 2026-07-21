@@ -1,4 +1,4 @@
-"""Tests for the on-chain split core (split.py) — pure, no network.
+"""Tests for the on-chain split core (split.py) - pure, no network.
 
     pytest test_split.py -q
 """
@@ -21,7 +21,7 @@ def test_plan_splits_90_10_by_default():
     assert plan.has_builder
     assert dict(plan.recipients) == {BUILDER: 1000, SELLER: 9000}
     # Not 0.10/0.90: a PushSplit retains 1 base unit and floors each share, so
-    # $1.00 pays out 99999/899999 units. Verified on a Base fork — see
+    # $1.00 pays out 99999/899999 units. Verified on a Base fork - see
     # fork-test/EndToEnd.t.sol.
     assert plan.amounts_units(1.00) == {BUILDER: 99_999, SELLER: 899_999}
     assert plan.dust_units(1.00) == 2
@@ -31,7 +31,7 @@ def test_plan_splits_90_10_by_default():
 
 
 def test_payout_never_exceeds_what_the_chain_pays():
-    """The ledger must never over-credit a builder — that's a real payout gap."""
+    """The ledger must never over-credit a builder - that's a real payout gap."""
     plan = split.build_split_plan(SELLER, BUILDER, builder_code="bc_alice")
     for price in (0.001, 0.01, 1.00, 4.20, 99.99, 1000.00):
         units = plan.amounts_units(price)

@@ -10,7 +10,7 @@ venv/
 affiliation.db
 *.db
 
-# Foundry (fork-test/) — deps + build artifacts. Run `forge install` to set up.
+# Foundry (fork-test/) - deps + build artifacts. Run `forge install` to set up.
 fork-test/lib/
 fork-test/out/
 fork-test/cache/

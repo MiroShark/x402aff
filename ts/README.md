@@ -1,6 +1,6 @@
 # @x402-affiliation/kit (TypeScript)
 
-The `Affiliation` facade for x402 sellers on the **Node / TypeScript** stack — a
+The `Affiliation` facade for x402 sellers on the **Node / TypeScript** stack - a
 port of the repo's Python [`affiliation.py`](../affiliation.py). Same three
 on-chain reads, same safe-fallback contract, and it resolves the **identical
 split address** as the Python kit for a given `(seller, builder)` pair (the
@@ -36,7 +36,7 @@ const payTo = await aff.payToFor(req.headers);     // the split, or your wallet
 // ── the payout side (permissionless) ──
 const { calls, balanceUnits } = await aff.release("bc_alice");
 for (const c of calls) {
-  // c.step ("deploy_split" | "distribute"), c.target, c.data — submit from any funded Base account
+  // c.step ("deploy_split" | "distribute"), c.target, c.data - submit from any funded Base account
 }
 ```
 
@@ -46,7 +46,7 @@ falls back to `sellerPayout` (unsplit, never a failed payment). Inject a viem
 
 ## Buyer side
 
-Builders attach their code with the official extension — no port needed:
+Builders attach their code with the official extension - no port needed:
 
 ```ts
 import { BuilderCodeClientExtension } from "@x402/extensions/builder-code";
@@ -58,7 +58,7 @@ client.registerExtension(new BuilderCodeClientExtension("bc_yourcode"));
 
 ```bash
 npm run typecheck   # tsc --noEmit
-npm test            # node --test (offline, mock viem transport) — 17 tests
+npm test            # node --test (offline, mock viem transport) - 17 tests
 ```
 
 Runs on Node ≥ 22 via built-in TypeScript type-stripping; no build step.

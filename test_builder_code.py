@@ -3,7 +3,7 @@
 Run:  pip install cbor2 pytest && pytest test_builder_code.py
 
 These prove the wire shape and the on-chain suffix round-trip. They do NOT prove
-real on-chain attribution — that needs a real Base-mainnet settlement verified
+real on-chain attribution - that needs a real Base-mainnet settlement verified
 against the calldata suffix (see README → Verify).
 """
 import pytest

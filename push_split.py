@@ -1,19 +1,19 @@
-"""0xSplits v2 PushSplit primitives — calldata + counterfactual address, no web3.
+"""0xSplits v2 PushSplit primitives - calldata + counterfactual address, no web3.
 
 These are the on-chain building blocks the CDP path uses to turn a `SplitPlan`
 into real transactions:
 
-  * ``predict_split_address(plan)`` — the pair's deterministic PushSplit address
+  * ``predict_split_address(plan)`` - the pair's deterministic PushSplit address
     (one ``eth_call`` to the factory) and whether it's deployed yet. This is the
     address the route's ``payTo`` is set to, and the address ``distribute`` runs
     on; USDC can land there BEFORE the split is deployed.
-  * ``create_split_calldata`` / ``distribute_calldata`` — the two legs that
+  * ``create_split_calldata`` / ``distribute_calldata`` - the two legs that
     release a funded split (deploy once, then distribute), both permissionless.
 
 Split params are fixed: ``owner = 0`` → the split is IMMUTABLE (recipients and
 ratios can never change), ``salt = 0`` → exactly one canonical address per
 ``(recipients, allocations)`` pair. Verified byte-for-byte against the live Base
-factory on a mainnet fork (see ``fork-test/CdpPath.t.sol``). No web3 dependency —
+factory on a mainnet fork (see ``fork-test/CdpPath.t.sol``). No web3 dependency -
 just ``requests`` for the one eth_call, mirroring ``resolver.py``.
 """
 from __future__ import annotations
@@ -28,7 +28,7 @@ import split
 
 # ── Base mainnet addresses ────────────────────────────────────────────────────
 USDC_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
-# 0xSplits PushSplitFactory V2.2 on Base — confirmed by the Splits team
+# 0xSplits PushSplitFactory V2.2 on Base - confirmed by the Splits team
 # (2026-07-15) and verified on-chain (Basescan: "PushSplitFactory", 0xSplits).
 # Canonical list: https://splits.org/protocol/docs/core/split-v2#addresses
 SPLITS_PUSH_FACTORY = os.environ.get(
@@ -62,7 +62,7 @@ def encode_split_params(plan: split.SplitPlan) -> str:
 
     Split = (address[] recipients, uint256[] allocations, uint256 totalAllocation,
     uint16 distributionIncentive). Allocations are the plan's bps (sum = 10000);
-    incentive is 0 — whoever calls distribute earns nothing, they just pay gas.
+    incentive is 0 - whoever calls distribute earns nothing, they just pay gas.
     """
     recips = [addr for addr, _ in plan.recipients]
     allocs = [bps for _, bps in plan.recipients]
@@ -79,7 +79,7 @@ def encode_split_params(plan: split.SplitPlan) -> str:
 
 
 def is_deployed_calldata(plan: split.SplitPlan) -> str:
-    """Calldata for factory.isDeployed(split, owner=0, salt=0) — owner 0 makes the
+    """Calldata for factory.isDeployed(split, owner=0, salt=0) - owner 0 makes the
     split IMMUTABLE (recipients fixed forever), salt 0 makes one canonical address
     per (recipients, allocations) pair. Verified byte-for-byte vs `cast calldata`."""
     return ("0x" + _SEL_IS_DEPLOYED + _word(0x60)
@@ -88,16 +88,16 @@ def is_deployed_calldata(plan: split.SplitPlan) -> str:
 
 def create_split_calldata(plan: split.SplitPlan, *, creator: str = ZERO_ADDRESS) -> str:
     """Calldata for factory.createSplitDeterministic(split, owner=0, creator, salt=0)
-    — the deploy leg. Same params as isDeployed, so it lands ON the predicted
+    - the deploy leg. Same params as isDeployed, so it lands ON the predicted
     address. Skip this leg when the pair's split is already deployed."""
     return ("0x" + _SEL_CREATE_DET + _word(0x80) + _addr_word(ZERO_ADDRESS)
             + _addr_word(creator) + ZERO_SALT[2:] + encode_split_params(plan))
 
 
 def distribute_calldata(plan: split.SplitPlan, *, distributor: str = ZERO_ADDRESS) -> str:
-    """Calldata for pushSplit.distribute(split, USDC, distributor) — pays every
+    """Calldata for pushSplit.distribute(split, USDC, distributor) - pays every
     recipient their bps of the split's CURRENT balance (arrival time irrelevant,
-    pre-deploy funding supported — confirmed by Splits). Incentive is 0 so
+    pre-deploy funding supported - confirmed by Splits). Incentive is 0 so
     ``distributor`` is only recorded in the event; any caller address is fine."""
     return ("0x" + _SEL_DISTRIBUTE + _word(0x60) + _addr_word(USDC_BASE)
             + _addr_word(distributor) + encode_split_params(plan))
@@ -111,7 +111,7 @@ def predict_split_address(
 ) -> tuple[str, bool]:
     """The pair's counterfactual PushSplit address + whether it's deployed yet.
 
-    One ``eth_call`` to factory.isDeployed — this is the address ``payTo`` is set
+    One ``eth_call`` to factory.isDeployed - this is the address ``payTo`` is set
     to and distribute is called on; funds may land there BEFORE deployment.
     """
     resp = requests.post(

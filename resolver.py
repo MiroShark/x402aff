@@ -3,7 +3,7 @@
 Base Builder Codes are an **ERC-721 NFT collection**: registering a code mints a
 token whose ID is derived from the code string, with an onchain **payout address**
 declaring where that code's rewards should be sent. So "which wallet owns which
-builder code" is a plain onchain read against the registry — no API key, no
+builder code" is a plain onchain read against the registry - no API key, no
 indexer, works for any code anyone has ever registered.
 
   Registry (Base mainnet): 0x000000BC7E6457e610fe52Dcc0ca5b3ce59C8E80
@@ -12,13 +12,13 @@ indexer, works for any code anyone has ever registered.
     - Implements the ERC-8021 ICodesRegistry interface.
 
 Two addresses come back, and they are NOT the same thing:
-  - owner          — who holds the code NFT (can transfer it / update its payout)
-  - payout_address — where rewards for the code should be sent  ← pay THIS one
+  - owner          - who holds the code NFT (can transfer it / update its payout)
+  - payout_address - where rewards for the code should be sent  ← pay THIS one
 
 IMPORTANT: for the free auto-generated `bc_*` codes, base.dev holds the NFT
 custodially, so `owner` is the base.dev REGISTRAR (one wallet holds tens of
 thousands of codes), NOT the builder. Only self-custodied / vanity codes have
-owner == the builder. Either way, `payout_address` is the meaningful recipient —
+owner == the builder. Either way, `payout_address` is the meaningful recipient -
 always pay that.
 
 This module speaks raw JSON-RPC `eth_call` (only needs `requests`), so it drops
@@ -39,9 +39,9 @@ DEFAULT_RPC = "https://mainnet.base.org"
 
 # 4-byte function selectors (keccak256(sig)[:4]). Hardcoded so this file needs no
 # keccak library; each is verified against the on-chain contract.
-_SEL_OWNER_OF = "6352211e"        # ownerOf(uint256)          — standard ERC-721
+_SEL_OWNER_OF = "6352211e"        # ownerOf(uint256)          - standard ERC-721
 _SEL_PAYOUT_BY_ID = "9b2c1793"    # payoutAddress(uint256)
-_SEL_OWNER_OF_STR = None          # (use the uint256 overloads — no string ABI encoding needed)
+_SEL_OWNER_OF_STR = None          # (use the uint256 overloads - no string ABI encoding needed)
 
 _CODE_RE = re.compile(r"^[a-z0-9_]{1,32}$")
 
@@ -101,7 +101,7 @@ def resolve(code: str, *, rpc_url: str = DEFAULT_RPC, timeout: float = 20.0) -> 
          "token_id": 131042744964646850211374452,
          "registered": True,
          "owner": "0xf9d7…8116",          # controls the code NFT
-         "payout_address": "0xa06c…54c8"} # where rewards go — pay this
+         "payout_address": "0xa06c…54c8"} # where rewards go - pay this
 
     ``registered`` is False (with owner/payout None) when no such code is minted.
     """
@@ -117,12 +117,12 @@ def resolve(code: str, *, rpc_url: str = DEFAULT_RPC, timeout: float = 20.0) -> 
 
 def resolve_many(codes, *, rpc_url: str = DEFAULT_RPC) -> dict[str, dict]:
     """Resolve several codes → {code: resolve(code)}. (Sequential; the registry
-    has no batch getter — wrap in a multicall if you need one round-trip.)"""
+    has no batch getter - wrap in a multicall if you need one round-trip.)"""
     return {c: resolve(c, rpc_url=rpc_url) for c in dict.fromkeys(codes)}
 
 
 if __name__ == "__main__":
-    # Live demo against Base mainnet — resolves real registered codes.
+    # Live demo against Base mainnet - resolves real registered codes.
     for code in ["leap_wallet", "bitcoin_com", "myetherwallet_mew", "definitely_not_a_real_code_xyz"]:
         r = resolve(code)
         if r["registered"]:

@@ -1,15 +1,15 @@
-"""Fan a funded per-pair split out to its recipients — the CDP-path payout leg.
+"""Fan a funded per-pair split out to its recipients - the CDP-path payout leg.
 
 On the request-time ``payTo`` path (`payto.py`) the CDP facilitator settles a
 plain USDC transfer into a per-pair PushSplit. The money is safe there (the split
 is ownerless) but sits until someone calls ``distribute``. This builds the two
 calls that release it:
 
-    deploy_split   — only the first time this pair is used (createSplitDeterministic)
-    distribute     — pay each recipient their bps of the split's current balance
+    deploy_split   - only the first time this pair is used (createSplitDeterministic)
+    distribute     - pay each recipient their bps of the split's current balance
 
 Both are **permissionless**: any address can submit them, so the builder can even
-self-serve. Every call here carries ready-to-submit calldata — signing and
+self-serve. Every call here carries ready-to-submit calldata - signing and
 broadcasting is yours (a funded Base account; gas is cents, and one distribute
 clears every payment that has accumulated in the pair since the last one).
 Use ``monitor.py`` to find which splits are holding funds ready to release.
@@ -50,7 +50,7 @@ def distribute_calls(
     distributor: Optional[str] = None,
 ) -> list[DistributeCall]:
     """The calls to release a funded pair. Empty when there's no builder leg
-    (a builderless payment was a plain transfer straight to the seller — nothing
+    (a builderless payment was a plain transfer straight to the seller - nothing
     ever entered a split, so there's nothing to distribute)."""
     if not plan.has_builder:
         return []
@@ -82,7 +82,7 @@ def distribute_calls(
 
 def split_balance_units(split_address: str, *, rpc_url: Optional[str] = None,
                         timeout: float = 20.0) -> int:
-    """USDC balance sitting in the split right now (base units) — how much the
+    """USDC balance sitting in the split right now (base units) - how much the
     next distribute will release. One ``eth_call`` to USDC.balanceOf."""
     data = "0x" + _SEL_BALANCE_OF + push_split._addr_word(split_address)
     resp = requests.post(
@@ -125,7 +125,7 @@ if __name__ == "__main__":
         builder_code="bc_alice",
         builder_share_bps=push_split.BUILDER_SHARE_BPS,
     )
-    print("release a funded per-pair split (CDP path — no settler):\n")
+    print("release a funded per-pair split (CDP path - no settler):\n")
     for c in distribute_calls(
         demo, split_address="0x<predict_split_address(plan)>", deployed=False
     ):

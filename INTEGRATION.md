@@ -1,4 +1,4 @@
-# Enforced Affiliation — Integration Guide
+# Enforced Affiliation - Integration Guide
 
 How to wire the kit into your own x402 stack so the affiliate cut is **split
 on-chain, at settlement**, with **no facilitator of your own to run**. This is the
@@ -13,7 +13,7 @@ path validated end-to-end on Base mainnet (see `RUNBOOK-live-test.md`).
   and attaches the standard `s` extension.
 - Your server sets the route's **`payTo` to the per-`(you, builder)` 0xSplits
   PushSplit** for that request (`payto.payto_for_request`).
-- The **stock CDP facilitator** settles a plain USDC transfer into the split —
+- The **stock CDP facilitator** settles a plain USDC transfer into the split -
   sponsored gas, `a`/`s`/`w` written on-chain. Nothing of yours signs or settles.
 - Funds sit in the ownerless, immutable split until anyone calls `distribute`
   (`distribute.py`); `monitor.py` shows what's ready.
@@ -44,11 +44,11 @@ Three facts decide everything:
 1. **The buyer signs a gasless EIP-3009 authorization** committing to
    `(from, to = payTo, value, …)`. Whatever `payTo` the 402 advertised is where
    the money goes.
-2. **The facilitator settles by calling the USDC token** — a plain transfer to
+2. **The facilitator settles by calling the USDC token** - a plain transfer to
    `payTo`. It never calls an arbitrary contract. That's fine here: `payTo` is a
    PushSplit *address*, and USDC lands in it like any other account.
 3. **`s` is passive metadata** written into the settle calldata. It moves no money
-   — it's the tag that says "app `bc_alice` drove this."
+   - it's the tag that says "app `bc_alice` drove this."
 
 ## 2. The key move: `payTo` = the split
 
@@ -74,7 +74,7 @@ if pt.error:
   payment still works; it just isn't split. A bad resolve never breaks the paywall.
 
 Why is that split *enforced*? It's created **ownerless (`owner = 0`) and immutable**
-— recipients and the 10/90 ratio are fixed forever at its address. Once USDC lands
+- recipients and the 10/90 ratio are fixed forever at its address. Once USDC lands
 there, nobody (including you) can redirect the builder's cut.
 
 See `test_endpoint/app.py` for this as a FastAPI `DynamicPayTo` callback, and
@@ -103,32 +103,32 @@ See `test_endpoint/app.py` for this as a FastAPI `DynamicPayTo` callback, and
    deterministic so the 402 and the buyer's signed retry agree on `payTo`.
 3. **Point at the CDP facilitator** (mainnet). No custom facilitator, no keys.
 4. **Warm the cache** (optional) for expected builders at startup, so the first
-   402 for each needs no live RPC call — the public RPC rate-limits.
+   402 for each needs no live RPC call - the public RPC rate-limits.
 
 The reference `test_endpoint/app.py` does all four in ~130 lines.
 
 ## 5. Distribution & monitoring
 
-Payments accumulate per pair. Release them with `distribute.py` (permissionless —
+Payments accumulate per pair. Release them with `distribute.py` (permissionless -
 you, a keeper, or the builder can call it), and track what's owed with
 `monitor.py`. Neither needs the buyer's signature or any settle machinery; both
 just read the chain / CDP's index and emit calldata.
 
 To automate payouts, run `monitor.py` on a schedule and submit the `cast` commands
-it prints from a funded gas key — new code → collect → auto-distribute, hands-off.
+it prints from a funded gas key - new code → collect → auto-distribute, hands-off.
 
-## 6. Trust model — be clear-eyed
+## 6. Trust model - be clear-eyed
 
 Because `s` is a self-asserted tag (not part of the buyer's signature), resolving
 it tells you *where the money goes* (the code owner's registered payout), not that
 the submitter is entitled to that code. For an affiliate program that's the right
 level: the registered owner is paid regardless of who drove the traffic, and the
-**split ratio is enforced by an immutable contract** — that's the guarantee that
+**split ratio is enforced by an immutable contract** - that's the guarantee that
 matters. What it is *not* is a trustless proof of who drove a payment.
 
 The split is enforced; the *routing to it* is a client opt-in (the header). A
 generic x402 client that only sets `s` and never sends the header pays you
-directly, unsplit — which is safe (you keep 100%) but unattributed on-chain in
+directly, unsplit - which is safe (you keep 100%) but unattributed on-chain in
 money terms. For an affiliate program where builders opt in to earn, that's
 exactly the right shape.
 
@@ -151,24 +151,24 @@ exactly the right shape.
 
 ## 8. Verification / testing
 
-1. **Unit** — `python3 -m pytest -q` (68 tests: declare/decode, split math, payTo
+1. **Unit** - `python3 -m pytest -q` (68 tests: declare/decode, split math, payTo
    fallback + cache, Splits calldata byte-for-byte).
-2. **Fork** — `cd fork-test && forge test` (CDP-settle → split → distribute against
+2. **Fork** - `cd fork-test && forge test` (CDP-settle → split → distribute against
    live Base USDC + PushSplitFactory; asserts the ownerless split can't be
    redirected).
-3. **Live** — one real mainnet payment via `test_endpoint/` (`/try` page or
+3. **Live** - one real mainnet payment via `test_endpoint/` (`/try` page or
    `buyer.py`); paste the settle tx into `buildercode-checker.vercel.app` or decode
    it with `builder_code.parse_builder_code_suffix`, and confirm the split balance
    rose (`distribute.split_balance_units`). Walked through in `RUNBOOK-live-test.md`.
 
 ## References
 
-- ERC-8021 builder-code extension spec —
+- ERC-8021 builder-code extension spec -
   https://github.com/x402-foundation/x402/blob/main/specs/extensions/builder_code.md
-- Base Builder Codes registry — https://github.com/base/builder-codes
+- Base Builder Codes registry - https://github.com/base/builder-codes
   (`0x000000BC7E6457e610fe52Dcc0ca5b3ce59C8E80`)
-- EIP-3009 `transferWithAuthorization` — Circle FiatToken
+- EIP-3009 `transferWithAuthorization` - Circle FiatToken
   (Base USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`)
-- 0xSplits PushSplit V2 — https://splits.org/protocol/docs/core/split-v2
+- 0xSplits PushSplit V2 - https://splits.org/protocol/docs/core/split-v2
   (factory `0x8E8eB0cC6AE34A38B67D5Cf91ACa38f60bc3Ecf4`)
-- CDP Builder Codes — https://docs.cdp.coinbase.com/x402/core-concepts/builder-codes
+- CDP Builder Codes - https://docs.cdp.coinbase.com/x402/core-concepts/builder-codes

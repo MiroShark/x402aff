@@ -1,8 +1,8 @@
-"""Live x402 test endpoint — the CDP path from the affiliation kit, deployed.
+"""Live x402 test endpoint - the CDP path from the affiliation kit, deployed.
 
 One paid route (`POST /run`) that exercises the whole request-time-payTo design
 against the REAL Coinbase CDP facilitator on Base mainnet. The affiliation wiring
-is now a single `Affiliation` object — the two lines that matter are:
+is now a single `Affiliation` object - the two lines that matter are:
 
     aff = Affiliation(app_code=APP_CODE, seller_payout=SELLER_PAYOUT, rpc_url=RPC_URL)
     PaymentOption(..., pay_to=aff.pay_to)          # per-request split, from the header
@@ -10,7 +10,7 @@ is now a single `Affiliation` object — the two lines that matter are:
 
 At request time the CDP facilitator settles a plain USDC transfer into the
 per-pair PushSplit (sponsored gas, still writing `a`/`s`/`w` on-chain); the money
-then sits in the ownerless split until `distribute` releases it — no settler, no
+then sits in the ownerless split until `distribute` releases it - no settler, no
 7702, no facilitator of our own. Proven on a fork in `fork-test/CdpPath.t.sol`;
 this is the same path with real USDC.
 
@@ -47,7 +47,7 @@ from x402.http.middleware.fastapi import PaymentMiddlewareASGI  # noqa: E402
 from x402.mechanisms.evm.exact import ExactEvmServerScheme  # noqa: E402
 from x402.server import x402ResourceServer  # noqa: E402
 
-from affiliation import Affiliation  # noqa: E402  — the whole integration, one object
+from affiliation import Affiliation  # noqa: E402  - the whole integration, one object
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("x402-test-endpoint")
@@ -90,12 +90,12 @@ routes: dict[str, RouteConfig] = {
             )
         ],
         extensions=aff.extensions,       # declares `a` on-chain
-        description="x402 affiliation kit — live CDP-path test route",
+        description="x402 affiliation kit - live CDP-path test route",
         mime_type="application/json",
     )
 }
 
-app = FastAPI(title="x402 affiliation kit — live test endpoint")
+app = FastAPI(title="x402 affiliation kit - live test endpoint")
 app.add_middleware(PaymentMiddlewareASGI, routes=routes, server=server)
 
 
@@ -104,7 +104,7 @@ _TRY_HTML = os.path.join(os.path.dirname(os.path.abspath(__file__)), "try.html")
 
 @app.get("/try")
 async def try_page() -> FileResponse:
-    """Self-contained browser 'try it' page — connect a wallet and pay live.
+    """Self-contained browser 'try it' page - connect a wallet and pay live.
     Same-origin with /run, so no CORS is needed."""
     return FileResponse(_TRY_HTML, media_type="text/html")
 
@@ -117,7 +117,7 @@ async def run() -> dict:
 
 @app.get("/")
 async def health() -> dict:
-    """Unpaid health/info — confirms config without moving money."""
+    """Unpaid health/info - confirms config without moving money."""
     warm = aff.resolve(code=WARM_CODE)
     return {
         "status": "up",
@@ -149,4 +149,4 @@ async def _warm_cache() -> None:
         log.warning("warm attempt %d failed: %s", attempt + 1, pt.error)
         aff.clear_cache()
         time.sleep(3)
-    log.error("could not warm %s — first request may fall back to seller", WARM_CODE)
+    log.error("could not warm %s - first request may fall back to seller", WARM_CODE)
