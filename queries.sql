@@ -16,7 +16,7 @@
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 1. Codes on specific settlement transactions (the backfill / reconcile query).
+-- 1. Codes on specific settlement transactions (the reconcile query).
 --    Swap in your recorded settle_tx_hash values.
 -- ─────────────────────────────────────────────────────────────────────────────
 SELECT transaction_hash, groupArray(builder_code) AS codes
@@ -44,7 +44,7 @@ LIMIT 1000;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 3. Attribution leaderboard — attributed settlements per builder code, 30 days.
---    A full analytics rollup with no per-run backfill at all.
+--    A full analytics rollup with no per-run lookups at all.
 -- ─────────────────────────────────────────────────────────────────────────────
 SELECT builder_code, count() AS attributed_txs
 FROM base.transaction_attributions

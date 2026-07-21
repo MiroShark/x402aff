@@ -11,7 +11,7 @@ This discovers them with zero local state, using CDP's own attribution index:
   2. for each, predict the pair's split address and read its live USDC balance
   3. report which splits hold distributable funds, and emit the distribute call
 
-Needs CDP_API_KEY_ID + CDP_API_KEY_SECRET (same as backfill_sql.py) and a Base
+Needs CDP_API_KEY_ID + CDP_API_KEY_SECRET (same CDP JWT auth as cdp_sql.py) and a Base
 RPC (set X402_BASE_RPC to a paid one — the balance reads add up).
 
     X402_BUILDER_CODE=bc_...  X402_SELLER_PAYOUT=0x...  python3 monitor.py
@@ -26,7 +26,7 @@ from typing import Optional
 import cdp_sql
 import distribute
 import resolver
-import settler
+import push_split
 import split
 
 APP_CODE = os.environ.get("X402_BUILDER_CODE", "")
@@ -80,13 +80,13 @@ def discover_builder_codes(app_code: str, *, days: int = 90) -> list[str]:
 
 def status_for(code: str, *, seller_payout: str, rpc_url: Optional[str] = None) -> SplitStatus:
     """Resolve a code, predict its split, and read the split's USDC balance."""
-    info = resolver.resolve(code, rpc_url=rpc_url or settler.BASE_RPC)
+    info = resolver.resolve(code, rpc_url=rpc_url or push_split.BASE_RPC)
     payout = info.get("payout_address") if info.get("registered") else None
     if not payout:
         return SplitStatus(code, None, None, False, 0)
     plan = split.build_split_plan(seller_payout, payout, builder_code=code,
                                   builder_share_bps=SHARE_BPS)
-    addr, deployed = settler.predict_split_address(plan, rpc_url=rpc_url)
+    addr, deployed = push_split.predict_split_address(plan, rpc_url=rpc_url)
     bal = distribute.split_balance_units(addr, rpc_url=rpc_url)
     return SplitStatus(code, payout, addr, deployed, bal)
 
@@ -137,5 +137,5 @@ if __name__ == "__main__":
         print(f"# {r.builder_code} @ {r.split_address}")
         for c in calls:
             print(f"cast send {c.target} {c.data} "
-                  f"--rpc-url {settler.BASE_RPC} --private-key $KEY   # {c.step}")
+                  f"--rpc-url {push_split.BASE_RPC} --private-key $KEY   # {c.step}")
         print()

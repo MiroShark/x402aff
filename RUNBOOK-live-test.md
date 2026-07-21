@@ -9,7 +9,7 @@ The path under test (from `payto.py` + `distribute.py`): the buyer names the
 builder on the **unpaid** request → your 402 sets `payTo` = the per-pair PushSplit
 → the **stock CDP facilitator** settles a plain USDC transfer into it (sponsored
 gas, `a`/`s`/`w` still written) → anyone calls `distribute` to fan it out. No
-settler, no 7702, no facilitator to run. Verified on a fork in
+settler, no facilitator to run. Verified on a fork in
 `fork-test/CdpPath.t.sol`; this does it with real money.
 
 ## Prereqs

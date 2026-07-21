@@ -1,10 +1,9 @@
-"""Request-time ``payTo`` — enforce the split without running a facilitator.
+"""Request-time ``payTo`` — the enforced split, no facilitator of your own.
 
-The settler path (`settler.py`) reads the builder from the payment-time ``s``
-code and needs its own settle, because ``payTo`` is already fixed by then. This
-module is the other half of the fork: if you can name the builder *at 402 time*,
-``payTo`` can simply BE the per-pair split, and the stock CDP facilitator settles
-into it with sponsored gas — no facilitator, no 7702, no key handling.
+If the buyer's app names the builder *at 402 time* (a header on the unpaid
+request), then ``payTo`` can simply BE the per-pair split, and the stock CDP
+facilitator settles into it with sponsored gas — no settler, no 7702, no key
+handling on your side.
 
     unpaid request (carries X-Builder-Code)
         └─▶ payto_for_request()  → per-pair PushSplit address
@@ -12,20 +11,21 @@ into it with sponsored gas — no facilitator, no 7702, no key handling.
                     └─▶ CDP settles a plain USDC transfer into it (writes a/s/w)
                           └─▶ distribute.py fans it out later, permissionlessly
 
-Why this is still *enforced*: the split is created ownerless (``owner = 0``), so
-once funds land there the ratio is fixed and nobody — including you — can claw
-the builder's cut back. ``distribute`` is permissionless, so the builder can even
-call it themselves. Verified on a Base mainnet fork in
-``fork-test/CdpPath.t.sol``.
+Why this is *enforced*: the split is created ownerless (``owner = 0``), so once
+funds land there the ratio is fixed and nobody — including you — can claw the
+builder's cut back. ``distribute`` is permissionless, so the builder can even
+call it themselves. Verified on a Base mainnet fork in ``fork-test/CdpPath.t.sol``
+and end-to-end on Base mainnet (see ``RUNBOOK-live-test.md``).
 
-What you give up versus the settler: atomicity. Funds sit in the split until
-someone calls ``distribute``. They are safe while they wait, and batching a
-week's payments into one distribute is *cheaper* than splitting per payment.
+The tradeoff is non-atomicity: funds sit in the split until someone calls
+``distribute`` (safe while they wait, and batching many payments into one
+distribute is cheaper than splitting per payment — see ``monitor.py``).
 
 What it costs the buyer: their client must send the code on the **unpaid**
-request, not only inside the payment. That is one header beyond the standard
-``s`` extension — see ``buyer_client.py``. Buyers who don't send it still pay
-normally; they just route to the seller with no split.
+request, not only inside the payment. That is one header (``X-Builder-Code``)
+beyond the standard ``s`` extension — see ``buyer_client.py`` and the browser
+``test_endpoint/try.html``. Buyers who don't send it still pay normally; they
+just route to the seller with no split.
 
 SAFETY: a resolve failure must never break the paywall. Every entry point here
 falls back to the seller's own wallet, so the worst case is an unsplit payment,
@@ -38,7 +38,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 import resolver
-import settler
+import push_split
 import split
 
 # The header a buyer's client sets on the unpaid request. Same grammar as `s`.
@@ -114,7 +114,7 @@ def payto_for_request(
     if not seller:
         raise ValueError("seller_payout (or X402_SELLER_PAYOUT) is required")
     share = (
-        settler.BUILDER_SHARE_BPS if builder_share_bps is None else builder_share_bps
+        push_split.BUILDER_SHARE_BPS if builder_share_bps is None else builder_share_bps
     )
     code = split.primary_code(builder_code)
 
@@ -139,7 +139,7 @@ def payto_for_request(
                 _CACHE[key] = result
             return result
 
-        address, deployed = settler.predict_split_address(plan, rpc_url=rpc_url)
+        address, deployed = push_split.predict_split_address(plan, rpc_url=rpc_url)
         result = PayTo(address, plan, deployed, True)
         if use_cache:
             _CACHE[key] = result

@@ -9,10 +9,10 @@ calls that release it:
     distribute     — pay each recipient their bps of the split's current balance
 
 Both are **permissionless**: any address can submit them, so the builder can even
-self-serve. Neither needs the buyer's signature, so — unlike the settler — every
-call here carries ready-to-submit calldata. Signing/broadcasting is yours (a
-funded Base account; gas is cents, and one distribute clears every payment that
-has accumulated in the pair since the last one).
+self-serve. Every call here carries ready-to-submit calldata — signing and
+broadcasting is yours (a funded Base account; gas is cents, and one distribute
+clears every payment that has accumulated in the pair since the last one).
+Use ``monitor.py`` to find which splits are holding funds ready to release.
 
 Run ``python3 distribute.py`` for an offline demo against a stubbed builder, or
 ``distribute_plan(plan, rpc_url=...)`` to check the live on-chain balance first.
@@ -25,10 +25,10 @@ from typing import Optional
 
 import requests
 
-import settler
+import push_split
 import split
 
-USDC_BASE = settler.USDC_BASE
+USDC_BASE = push_split.USDC_BASE
 _SEL_BALANCE_OF = "70a08231"  # balanceOf(address)
 
 
@@ -55,16 +55,16 @@ def distribute_calls(
     if not plan.has_builder:
         return []
 
-    dist = distributor or settler.ZERO_ADDRESS
+    dist = distributor or push_split.ZERO_ADDRESS
     calls: list[DistributeCall] = []
     if not deployed:
         calls.append(
             DistributeCall(
                 "deploy_split",
-                settler.SPLITS_PUSH_FACTORY,
+                push_split.SPLITS_PUSH_FACTORY,
                 f"deploy the per-pair PushSplit at {split_address} "
                 "(first use of this pair; permissionless)",
-                settler.create_split_calldata(plan),
+                push_split.create_split_calldata(plan),
             )
         )
     recips = ", ".join(f"{a}:{bps}bps" for a, bps in plan.recipients)
@@ -74,7 +74,7 @@ def distribute_calls(
             split_address,
             f"distribute the split's USDC balance → [{recips}] "
             f"({plan.builder_share_bps}bps to {plan.builder_code})",
-            settler.distribute_calldata(plan, distributor=dist),
+            push_split.distribute_calldata(plan, distributor=dist),
         )
     )
     return calls
@@ -84,9 +84,9 @@ def split_balance_units(split_address: str, *, rpc_url: Optional[str] = None,
                         timeout: float = 20.0) -> int:
     """USDC balance sitting in the split right now (base units) — how much the
     next distribute will release. One ``eth_call`` to USDC.balanceOf."""
-    data = "0x" + _SEL_BALANCE_OF + settler._addr_word(split_address)
+    data = "0x" + _SEL_BALANCE_OF + push_split._addr_word(split_address)
     resp = requests.post(
-        rpc_url or settler.BASE_RPC,
+        rpc_url or push_split.BASE_RPC,
         json={"jsonrpc": "2.0", "id": 1, "method": "eth_call",
               "params": [{"to": USDC_BASE, "data": data}, "latest"]},
         timeout=timeout,
@@ -109,7 +109,7 @@ def distribute_plan(
     """
     if not plan.has_builder:
         return [], 0
-    address, deployed = settler.predict_split_address(plan, rpc_url=rpc_url)
+    address, deployed = push_split.predict_split_address(plan, rpc_url=rpc_url)
     balance = split_balance_units(address, rpc_url=rpc_url)
     calls = distribute_calls(
         plan, split_address=address, deployed=deployed, distributor=distributor
@@ -123,7 +123,7 @@ if __name__ == "__main__":
             "X402_SELLER_PAYOUT", "0x2222222222222222222222222222222222222222"),
         builder_payout="0x1111111111111111111111111111111111111111",
         builder_code="bc_alice",
-        builder_share_bps=settler.BUILDER_SHARE_BPS,
+        builder_share_bps=push_split.BUILDER_SHARE_BPS,
     )
     print("release a funded per-pair split (CDP path — no settler):\n")
     for c in distribute_calls(

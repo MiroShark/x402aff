@@ -110,9 +110,10 @@ def parse_builder_code_suffix(calldata: Any) -> dict[str, Any] | None:
     The reverse of what the facilitator appends at settle time (the Python
     equivalent of TS ``parseBuilderCodeSuffixFromCalldata``). Returns a dict with
     whichever of ``a`` / ``w`` / ``s`` are present, or ``None`` when there is no
-    valid Schema 2 suffix — so it's safe to call on ANY transaction. Used by the
-    daily backfill to read the authoritative on-chain attribution, above all
-    ``w`` (the facilitator wallet code), which only exists post-settle.
+    valid Schema 2 suffix — so it's safe to call on ANY transaction. Use it to
+    read the authoritative on-chain attribution off a settle tx — ``a`` / ``s``
+    and above all ``w`` (the facilitator wallet code), which only exists
+    post-settle (as the live-test verification in ``RUNBOOK-live-test.md`` does).
 
     ``calldata`` may be a hex string (``0x...``) or raw ``bytes``. Never raises.
     """

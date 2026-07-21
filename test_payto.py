@@ -6,7 +6,7 @@ patched — these pin the *routing and safety* logic, not on-chain behaviour
 """
 import distribute
 import payto
-import settler
+import push_split
 import split
 
 SELLER = "0x2222222222222222222222222222222222222222"
@@ -50,14 +50,14 @@ def test_header_layered_codes_take_primary():
 
 def test_no_code_is_seller_wallet_no_network(monkeypatch):
     # Must not touch the network at all when there's no code.
-    monkeypatch.setattr(settler, "predict_split_address", _boom)
+    monkeypatch.setattr(push_split, "predict_split_address", _boom)
     r = payto.payto_for_request(None, seller_payout=SELLER)
     assert r.address == SELLER and not r.attributed and r.error is None
 
 
 def test_registered_code_routes_to_split(monkeypatch):
     monkeypatch.setattr(split, "resolve_and_plan", _plan_with_builder)
-    monkeypatch.setattr(settler, "predict_split_address", lambda plan, **k: (SPLIT, False))
+    monkeypatch.setattr(push_split, "predict_split_address", lambda plan, **k: (SPLIT, False))
     r = payto.payto_for_request("bc_alice", seller_payout=SELLER)
     assert r.attributed and r.address == SPLIT and not r.split_deployed
     assert r.plan.has_builder and r.plan.builder_payout == BUILDER
@@ -66,7 +66,7 @@ def test_registered_code_routes_to_split(monkeypatch):
 def test_unregistered_code_falls_back_to_seller(monkeypatch):
     monkeypatch.setattr(split, "resolve_and_plan",
                         lambda *a, **k: split.build_split_plan(SELLER, None, builder_code="bc_ghost"))
-    monkeypatch.setattr(settler, "predict_split_address", _boom)
+    monkeypatch.setattr(push_split, "predict_split_address", _boom)
     r = payto.payto_for_request("bc_ghost", seller_payout=SELLER)
     assert r.address == SELLER and not r.attributed and r.error is None
 
@@ -80,7 +80,7 @@ def test_resolve_failure_never_breaks_the_paywall(monkeypatch):
 
 def test_predict_failure_falls_back(monkeypatch):
     monkeypatch.setattr(split, "resolve_and_plan", _plan_with_builder)
-    monkeypatch.setattr(settler, "predict_split_address", _boom)
+    monkeypatch.setattr(push_split, "predict_split_address", _boom)
     r = payto.payto_for_request("bc_alice", seller_payout=SELLER)
     assert r.address == SELLER and not r.attributed and r.error
 
@@ -95,7 +95,7 @@ def test_success_is_cached_no_second_lookup(monkeypatch):
         return _plan_with_builder(*a, **k)
 
     monkeypatch.setattr(split, "resolve_and_plan", counting_plan)
-    monkeypatch.setattr(settler, "predict_split_address", lambda plan, **k: (SPLIT, False))
+    monkeypatch.setattr(push_split, "predict_split_address", lambda plan, **k: (SPLIT, False))
     payto.payto_for_request("bc_alice", seller_payout=SELLER)
     payto.payto_for_request("bc_alice", seller_payout=SELLER)
     assert calls["n"] == 1, "second request should hit the cache"
@@ -107,7 +107,7 @@ def test_failure_is_not_cached(monkeypatch):
     # A transient RPC failure must not strand the builder for the process life:
     # next call retries (here it succeeds).
     monkeypatch.setattr(split, "resolve_and_plan", _plan_with_builder)
-    monkeypatch.setattr(settler, "predict_split_address", lambda plan, **k: (SPLIT, True))
+    monkeypatch.setattr(push_split, "predict_split_address", lambda plan, **k: (SPLIT, True))
     r = payto.payto_for_request("bc_alice", seller_payout=SELLER)
     assert r.attributed and r.split_deployed
 
@@ -132,11 +132,11 @@ def test_builderless_plan_has_nothing_to_distribute():
     assert distribute.distribute_calls(plan, split_address=SPLIT, deployed=False) == []
 
 
-def test_distribute_calldata_matches_settler():
-    # distribute.py must emit byte-identical calldata to the audited settler path.
+def test_distribute_calldata_matches_push_split():
+    # distribute.py must emit byte-identical calldata to the audited push_split encoding.
     plan = split.build_split_plan(SELLER, BUILDER, builder_code="bc_alice")
     calls = distribute.distribute_calls(plan, split_address=SPLIT, deployed=True)
-    assert calls[0].data == settler.distribute_calldata(plan)
+    assert calls[0].data == push_split.distribute_calldata(plan)
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -144,7 +144,7 @@ def test_distribute_calldata_matches_settler():
 def _plan_with_builder(*a, **k):
     return split.build_split_plan(
         SELLER, BUILDER, builder_code="bc_alice",
-        builder_share_bps=settler.BUILDER_SHARE_BPS,
+        builder_share_bps=push_split.BUILDER_SHARE_BPS,
     )
 
 
