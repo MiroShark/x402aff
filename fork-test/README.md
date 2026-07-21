@@ -36,6 +36,25 @@ optimization) and floors each share, so a $1.00 payment pays **$0.099999 /
 $0.899999**, not $0.10 / $0.90 — mirrored by `split.amounts_units()` so the
 ledger reconciles to the unit.
 
+**`Delegation7702.t.sol`** — the same settle, but through a **real signed EIP-7702
+delegation** instead of `vm.prank`. A minimal `BatchExecutor` (`execute(Call[])`,
+gated on `msg.sender == address(this)`) is attached to the settler EOA with
+`vm.signAndAttachDelegation`, and the four legs run as one batch.
+
+| Test | Asserts |
+|---|---|
+| `test_delegationIsAttached` | the settler's code becomes `0xef0100 ++ implementation` |
+| `test_thirdPartyCannotDriveTheBatch` | a delegated EOA is still only drivable by itself (`NotSelf`) |
+| `test_fullSettle_1USDC_via7702` / `_10USDC_via7702` | identical payouts to `EndToEnd.t.sol`; settler retains 0 USDC |
+| `test_failingLegRollsBackThePull` | a failing leg unwinds the pull — buyer keeps their USDC, nothing stranded |
+
+That last one is the reason to batch at all: as four separate transactions, a
+failure after the pull would leave the buyer's money sitting on the settler.
+
+⚠️ The settler key here is high-entropy on purpose. Weak keys (`0x7702`, `0x01`,
+…) already carry **live** 7702 delegations on Base from sweeper bots, so a fork
+using one starts dirty and `test_delegationIsAttached` fails against real state.
+
 ## Regenerating the calldata
 
 If you change the plan (share, addresses), regenerate the constants:
@@ -54,8 +73,13 @@ print('DISTRIBUTE ', settler.distribute_calldata(plan,
 "
 ```
 
+`DISTRIBUTE` embeds the `distributor` address, so `Delegation7702.t.sol` needs
+its own blob — regenerate that one with
+`distributor='0xbE248921595D7fbA89190D70CCB1b12cAFD02342'` (that suite's settler).
+`IS_DEPLOYED` and `CREATE` are settler-independent and shared by both suites.
+
 ## Not covered
 
-Signing and submitting the multicall from a real 7702 account — the tests
-`vm.prank` the settler rather than authorizing one. That's the remaining
-integration step.
+Broadcasting for real: these tests sign a delegation but never submit a
+transaction to Base. Gas accounting, nonce management, and settler liveness are
+still yours — do a testnet or small mainnet run before real money moves.
