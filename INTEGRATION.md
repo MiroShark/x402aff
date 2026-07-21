@@ -68,9 +68,16 @@ the builders *they* pay trust *them*, not you.
 `settler.py` now emits ready-to-submit calldata for the deploy
 (`createSplitDeterministic`), `fund_split`/`payout_seller` (plain USDC
 `transfer`) and `distribute` legs (`owner=0` → immutable split, `salt=0` → one
-canonical address per pair). What's left to you: the pull leg's calldata (built
-at runtime from the buyer's signed EIP-3009 authorization) and
-signing/submitting the multicall with your 7702 settler account.
+canonical address per pair). The pull leg is built at runtime from the buyer's
+signed EIP-3009 authorization, and `fork-test/Delegation7702.t.sol` runs all four
+legs through a real signed 7702 delegation — so the only step left to you is
+**broadcasting**: a funded settler account, nonce management, gas, liveness.
+
+> **Pick your settler key carefully.** Weak keys already carry *live* 7702
+> delegations on Base from sweeper bots — `0x7702` derives
+> `0x3C99B48A…`, which currently has a designator pointing at `0x7c802f06…`. Any
+> settler key must be generated with real entropy; the address is your route's
+> `payTo`, so a swept key is a drained route.
 
 **⚠️ Set the route's `payTo` to your settler account** (`X402_SETTLER_ACCOUNT`).
 The buyer's EIP-3009 authorization names its recipient, and

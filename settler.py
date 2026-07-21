@@ -44,9 +44,15 @@ program; not for adversarial counterparties.
 This module builds the *plan* and the *real calldata* for every leg except the
 pull (which needs the buyer's runtime signature). The whole sequence — predicted
 address, deploy, forward, distribute — is verified end-to-end against the live
-Base factory on a mainnet fork; see `fork-test/`. The piece left to you is
-signing + submitting the multicall with your 7702 settler account — every
-target/calldata pair below drops straight into its call list.
+Base factory on a mainnet fork, including through a real signed EIP-7702
+delegation; see `fork-test/`. The piece left to you is *broadcasting*: a funded
+settler account, nonce management, gas, liveness. Every target/calldata pair
+below drops straight into the batch's call list.
+
+Two operational notes before mainnet: generate the settler key with real entropy
+(weak keys already carry live 7702 delegations on Base from sweeper bots, and
+this address is your route's `payTo`), and point `X402_BASE_RPC` at a paid
+endpoint — the public one rate-limits, and a failed resolve drops attribution.
 """
 from __future__ import annotations
 

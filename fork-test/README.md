@@ -7,7 +7,7 @@ These tests fork Base mainnet locally and run the settler's legs against the
 ```bash
 cd fork-test
 forge install foundry-rs/forge-std     # first time only
-forge test -vv                         # ~4s
+forge test -vv                         # 11 tests; ~10s warm, ~40s on a cold fork
 ```
 
 ## What they pin down
