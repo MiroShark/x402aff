@@ -7,9 +7,10 @@ If you sell an API behind an [x402](https://x402.org) paywall, this splits each
 payment so the builder whose app drove it earns a share (default **10%**) -
 automatically, verifiably, on Base.
 
-> Validated end-to-end on **Base mainnet**: a real browser payment settled through
-> the Coinbase CDP facilitator into a per-builder [0xSplits](https://splits.org)
-> split, `a`/`s`/`w` written on-chain. See [`RUNBOOK-live-test.md`](./RUNBOOK-live-test.md).
+> Validated on **Base mainnet** and reproducible on a mainnet fork: the Coinbase
+> CDP facilitator settles into a per-builder [0xSplits](https://splits.org) split
+> with `a`/`s`/`w` written on-chain, and anyone can `distribute` it. See the
+> Foundry proof in [`fork-test/`](./fork-test).
 
 ---
 
@@ -63,7 +64,21 @@ Both ship as a one-object `Affiliation` facade, and both resolve the **identical
 split address (the TS encoding is asserted byte-for-byte against Python). Get an app
 code at [base.dev](https://base.dev) → *Settings → Builder Codes*, then:
 
-### Python → [`affiliation.py`](./affiliation.py) · guide: [`INTEGRATION.md`](./INTEGRATION.md)
+### TypeScript / Node → [`ts/`](./ts) · guide: [`ts/README.md`](./ts/README.md)
+
+```ts
+import { Affiliation } from "@x402-affiliation/kit";
+
+const aff = new Affiliation({ appCode: "bc_yourcode", sellerPayout: "0x…" });
+
+const payTo = await aff.payToFor(req.headers);   // the split, or your wallet
+const extensions = aff.extensions;               // declares your `a`
+// payouts: const { calls, balanceUnits } = await aff.release("bc_alice");
+```
+
+Only dependency: `viem`.
+
+### Python → [`python/`](./python) · guide: [`INTEGRATION.md`](./docs/INTEGRATION.md)
 
 ```python
 from affiliation import Affiliation
@@ -78,21 +93,8 @@ RouteConfig(..., extensions=aff.extensions)   # declares your app code `a`
 calls, balance = aff.release("bc_alice")
 ```
 
-Full FastAPI wiring: [`test_endpoint/app.py`](./test_endpoint/app.py).
-
-### TypeScript / Node → [`ts/`](./ts) · guide: [`ts/README.md`](./ts/README.md)
-
-```ts
-import { Affiliation } from "@x402-affiliation/kit";
-
-const aff = new Affiliation({ appCode: "bc_yourcode", sellerPayout: "0x…" });
-
-const payTo = await aff.payToFor(req.headers);   // the split, or your wallet
-const extensions = aff.extensions;               // declares your `a`
-// payouts: const { calls, balanceUnits } = await aff.release("bc_alice");
-```
-
-Only dependency: `viem`.
+`aff.pay_to` is a drop-in x402 `DynamicPayTo` callback; `aff.pay_to_for(headers)`
+is the sync form for other frameworks. Full wiring notes: [`docs/INTEGRATION.md`](./docs/INTEGRATION.md).
 
 Both **never throw**: an unknown or unresolvable code falls back to your wallet -
 the payment always works, it just isn't split. And the **buyer side is one line** in
@@ -121,18 +123,18 @@ funds stay safe and distribute at the old ratio.
 
 A split takes any recipients whose allocations sum to `10000`. Build a `SplitPlan`
 directly (Python) and address-prediction + distribute just work - see the
-**Customize** notes in [`INTEGRATION.md`](./INTEGRATION.md).
+**Customize** notes in [`INTEGRATION.md`](./docs/INTEGRATION.md).
 
 ### Release payouts
 
-`distribute` is permissionless. `aff.pending()` (or [`monitor.py`](./monitor.py) as a
+`distribute` is permissionless. `aff.pending()` (or [`monitor.py`](./python/monitor.py) as a
 CLI) discovers every builder who paid you - straight from CDP's index, no local
 ledger - and shows which splits are ready to release, with the `cast` commands.
 
 ### Any other language (Go, Rust, …)
 
 It's just three view-calls against two contracts - port
-[`ts/src/affiliation.ts`](./ts/src/affiliation.ts) or [`affiliation.py`](./affiliation.py):
+[`ts/src/affiliation.ts`](./ts/src/affiliation.ts) or [`python/affiliation.py`](./python/affiliation.py):
 
 1. **code → payout** - `payoutAddress(uint256)` on the registry
    `0x000000BC7E6457e610fe52Dcc0ca5b3ce59C8E80` (token id = the code's ASCII bytes
@@ -156,7 +158,7 @@ It's just three view-calls against two contracts - port
   code's registered payout), not who's *entitled* to it. Right level for an
   affiliate program.
 
-Full trust model, edge cases, and caveats: [`INTEGRATION.md`](./INTEGRATION.md).
+Full trust model, edge cases, and caveats: [`INTEGRATION.md`](./docs/INTEGRATION.md).
 
 ---
 
@@ -164,14 +166,13 @@ Full trust model, edge cases, and caveats: [`INTEGRATION.md`](./INTEGRATION.md).
 
 | Path | What it is |
 |------|------------|
-| [`affiliation.py`](./affiliation.py) · [`ts/`](./ts) | **Start here** - the `Affiliation` facades (Python + TypeScript). |
-| [`INTEGRATION.md`](./INTEGRATION.md) | Python integration deep-dive (money path, trust model, wiring, caveats). |
-| [`test_endpoint/`](./test_endpoint) | Deployable FastAPI x402 endpoint + `try.html`, a one-page browser client to pay it live. |
+| [`ts/`](./ts) · [`python/`](./python) | **Start here** - the `Affiliation` facades (TypeScript + Python). |
+| [`docs/INTEGRATION.md`](./docs/INTEGRATION.md) | Python integration deep-dive (money path, trust model, wiring, caveats). |
 | [`fork-test/`](./fork-test) | Foundry proof: CDP-settle → split → distribute against live Base contracts on a mainnet fork. |
-| `resolver.py` · `split.py` · `push_split.py` · `payto.py` · `distribute.py` · `monitor.py` | The primitives the facades wrap (code→payout, split plan, 0xSplits calldata, request-time payTo, release, monitoring). |
+| `python/{resolver,split,push_split,payto,distribute,monitor}.py` | The primitives the facades wrap (code→payout, split plan, 0xSplits calldata, request-time payTo, release, monitoring). |
 
 ```bash
-python3 -m pytest -q            # Python unit tests
+cd python && pytest            # Python unit tests
 cd ts && npm test              # TypeScript tests
 cd fork-test && forge test     # mainnet-fork proof
 ```

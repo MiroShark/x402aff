@@ -15,7 +15,7 @@ Why this is *enforced*: the split is created ownerless (``owner = 0``), so once
 funds land there the ratio is fixed and nobody - including you - can claw the
 builder's cut back. ``distribute`` is permissionless, so the builder can even
 call it themselves. Verified on a Base mainnet fork in ``fork-test/CdpPath.t.sol``
-and end-to-end on Base mainnet (see ``RUNBOOK-live-test.md``).
+and end-to-end on Base mainnet.
 
 The tradeoff is non-atomicity: funds sit in the split until someone calls
 ``distribute`` (safe while they wait, and batching many payments into one
@@ -23,9 +23,9 @@ distribute is cheaper than splitting per payment - see ``monitor.py``).
 
 What it costs the buyer: their client must send the code on the **unpaid**
 request, not only inside the payment. That is one header (``X-Builder-Code``)
-beyond the standard ``s`` extension - see ``buyer_client.py`` and the browser
-``test_endpoint/try.html``. Buyers who don't send it still pay normally; they
-just route to the seller with no split.
+beyond the standard ``s`` extension - see ``buyer_client.py`` (the buyer-side
+extension). Buyers who don't send it still pay normally; they just route to the
+seller with no split.
 
 SAFETY: a resolve failure must never break the paywall. Every entry point here
 falls back to the seller's own wallet, so the worst case is an unsplit payment,

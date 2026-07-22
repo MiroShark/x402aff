@@ -1,9 +1,0 @@
-# Superset: kit deps + the live test endpoint's server/facilitator deps.
-# Railway installs from this file (see ../nixpacks.toml).
-requests>=2.28
-cbor2>=5.4
-x402>=2.12
-cdp-sdk>=1.0
-httpx>=0.27           # x402 facilitator client transport (not pulled in by slim image)
-fastapi>=0.110
-uvicorn[standard]>=0.29
