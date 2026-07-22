@@ -53,5 +53,6 @@ print('DISTRIBUTE ', push_split.distribute_calldata(plan))
 ## Not covered
 
 Broadcasting for real - the test uses `deal`/`prank` and never submits a
-transaction to Base. The one live money step (a real payment through a deployed
-endpoint) is in `../RUNBOOK-live-test.md`, and was validated on mainnet.
+transaction to Base. The one live-money step (a real payment through a deployed
+x402 endpoint) is left to you: point your endpoint's `payTo` at the split and pay
+it once. The path was also validated end-to-end on mainnet during development.

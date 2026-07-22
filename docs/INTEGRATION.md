@@ -2,7 +2,8 @@
 
 How to wire the kit into your own x402 stack so the affiliate cut is **split
 on-chain, at settlement**, with **no facilitator of your own to run**. This is the
-path validated end-to-end on Base mainnet (see `RUNBOOK-live-test.md`).
+path validated on Base mainnet and reproducible on a mainnet fork (see
+[`../fork-test/`](../fork-test)).
 
 ---
 
@@ -77,12 +78,18 @@ Why is that split *enforced*? It's created **ownerless (`owner = 0`) and immutab
 - recipients and the 10/90 ratio are fixed forever at its address. Once USDC lands
 there, nobody (including you) can redirect the builder's cut.
 
-See `test_endpoint/app.py` for this as a FastAPI `DynamicPayTo` callback, and
-`test_endpoint/try.html` for the browser client that sends the header.
+The [`Affiliation`](../python/affiliation.py) facade wraps this: `aff.pay_to` is a
+drop-in x402 `DynamicPayTo` callback, and `aff.pay_to_for(headers)` is the sync
+form for other frameworks. The buyer attaches its code with the official
+`@x402/extensions/builder-code` client extension.
 
 ## 3. Components
 
-| File | Role in the path |
+All kit modules live in [`python/`](../python) (import them by bare name from
+there). The one-object [`affiliation.py`](../python/affiliation.py) facade wraps
+the modules below.
+
+| File (`python/…`) | Role in the path |
 |---|---|
 | `builder_code.py` | `declare_builder_code(a)` on the route; `parse_builder_code_suffix()` to decode `a`/`s`/`w` off a settle tx. |
 | `resolver.py` | Builder code → registered payout address (one `eth_call`, no keys). |
@@ -105,7 +112,8 @@ See `test_endpoint/app.py` for this as a FastAPI `DynamicPayTo` callback, and
 4. **Warm the cache** (optional) for expected builders at startup, so the first
    402 for each needs no live RPC call - the public RPC rate-limits.
 
-The reference `test_endpoint/app.py` does all four in ~130 lines.
+The [`Affiliation`](../python/affiliation.py) facade does 1-2 for you: pass
+`extensions=aff.extensions` and `pay_to=aff.pay_to` to your route.
 
 ## 5. Distribution & monitoring
 
@@ -151,15 +159,17 @@ exactly the right shape.
 
 ## 8. Verification / testing
 
-1. **Unit** - `python3 -m pytest -q` (68 tests: declare/decode, split math, payTo
-   fallback + cache, Splits calldata byte-for-byte).
+1. **Unit** - `cd python && pytest` (declare/decode, split math, payTo fallback +
+   cache, the `Affiliation` facade, Splits calldata byte-for-byte). The TypeScript
+   port has its own suite: `cd ts && npm test`.
 2. **Fork** - `cd fork-test && forge test` (CDP-settle → split → distribute against
    live Base USDC + PushSplitFactory; asserts the ownerless split can't be
    redirected).
-3. **Live** - one real mainnet payment via `test_endpoint/` (`/try` page or
-   `buyer.py`); paste the settle tx into `buildercode-checker.vercel.app` or decode
-   it with `builder_code.parse_builder_code_suffix`, and confirm the split balance
-   rose (`distribute.split_balance_units`). Walked through in `RUNBOOK-live-test.md`.
+3. **Live** - point your own x402 endpoint's `payTo` at the split (as in §2), pay
+   it once with any x402 client, then paste the settle tx into
+   `buildercode-checker.vercel.app` (or decode it with
+   `builder_code.parse_builder_code_suffix`) and confirm the split balance rose
+   (`distribute.split_balance_units`).
 
 ## References
 

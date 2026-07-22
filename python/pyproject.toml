@@ -1,0 +1,7 @@
+# The Python kit is a set of flat modules (payto.py, split.py, …) that import
+# each other by top-level name. This puts python/ on sys.path for pytest so the
+# tests under tests/ resolve those imports.
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"

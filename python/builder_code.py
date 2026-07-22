@@ -113,7 +113,7 @@ def parse_builder_code_suffix(calldata: Any) -> dict[str, Any] | None:
     valid Schema 2 suffix - so it's safe to call on ANY transaction. Use it to
     read the authoritative on-chain attribution off a settle tx - ``a`` / ``s``
     and above all ``w`` (the facilitator wallet code), which only exists
-    post-settle (as the live-test verification in ``RUNBOOK-live-test.md`` does).
+    post-settle.
 
     ``calldata`` may be a hex string (``0x...``) or raw ``bytes``. Never raises.
     """
