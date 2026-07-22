@@ -25,7 +25,6 @@ The only third-party dependency is `cbor2`, and only for parse_builder_code_suff
 """
 from __future__ import annotations
 
-import os
 import re
 from typing import Any
 
@@ -42,9 +41,11 @@ BUILDER_CODE_PATTERN = r"^[a-z0-9_]{1,32}$"
 # - with no split-address reconstruction, and it catches even UNDEPLOYED splits
 # (the marker is written at settle time, not at deploy). It rides alongside the
 # real builder code; the split always pays the PRIMARY (first) code, so the marker
-# never changes a payout. Override with X402_AFFILIATION_MARKER (which scopes
-# discovery to your own marker), or set it to "" to opt out of tagging entirely.
-AFFILIATION_MARKER = os.environ.get("X402_AFFILIATION_MARKER", "x402aff")
+# never changes a payout, and it needs no registration (it is stamped and indexed
+# even when unregistered). It is HARDCODED and identical across every kit install -
+# that shared constant is exactly what makes one query discover them all, so it is
+# deliberately not configurable.
+AFFILIATION_MARKER = "x402aff"
 
 # ERC-8021 Schema 2 trailer (16 bytes) that closes every attribution suffix.
 # Read from the END of the settlement calldata, the suffix is laid out as:

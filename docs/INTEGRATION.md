@@ -129,8 +129,8 @@ it prints from a funded gas key - new code → collect → auto-distribute, hand
 
 `monitor.py` finds splits for *your* app code. To find every kit-routed payment
 **ecosystem-wide** - across sellers you don't know - the buyer extension stamps a
-fixed, **shared** marker code (`builder_code.AFFILIATION_MARKER`, default
-`x402aff`) as a second `s` on every payment. Because every kit install uses the
+fixed, **shared** marker code (`builder_code.AFFILIATION_MARKER` = the hardcoded
+`x402aff`) as a second `s` on every payment. Because every kit install stamps the
 same marker, one query finds them all. It rides alongside the real builder code
 and never changes a payout (the split always pays the primary code), but it makes
 kit payments self-identifying on-chain. Discovery is then a single cheap query
@@ -145,8 +145,10 @@ WHERE builder_code = 'x402aff' AND action = 1;
 
 Join those tx hashes to the USDC `Transfer` in `base.events` (bounded by their
 `block_number`, so the scan stays tiny) to recover each payment's `payTo` (the
-split), then read its balance as usual - see `queries.sql` #5. Claim the marker
-code once so it is yours alone. Because `s` is buyer-attached, the marker tags
+split), then read its balance as usual - see `queries.sql` #5. The marker needs no
+registration - it is stamped into the settlement suffix and indexed even as an
+unregistered code, and as a shared label it is not exclusive. Because `s` is
+buyer-attached, the marker tags
 payments made through the kit's client extension - exactly the opted-in population.
 
 ## 6. Trust model - be clear-eyed

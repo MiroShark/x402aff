@@ -67,10 +67,10 @@ WHERE transaction_hash IN ('0xYOUR_SETTLE_TX_HASH_1')
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 5. Every kit-routed payment, ECOSYSTEM-WIDE (the AFFILIATION_MARKER path).
---    The kit's buyer extension stamps a fixed, shared marker code as a second
---    `s`, so every payment that used this kit self-identifies - no payTo
---    reconstruction, and it includes splits funded but never deployed. Swap the
---    marker string if you overrode X402_AFFILIATION_MARKER.
+--    The kit's buyer extension stamps a hardcoded, shared marker (`x402aff`) as a
+--    second `s`, so every payment that used this kit self-identifies - no payTo
+--    reconstruction, and it includes splits funded but never deployed. The marker
+--    is the same for every kit install, so this one query finds them all.
 -- ─────────────────────────────────────────────────────────────────────────────
 SELECT DISTINCT transaction_hash
 FROM base.transaction_attributions

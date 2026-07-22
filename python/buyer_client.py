@@ -18,34 +18,36 @@ Every payment also carries a fixed, SHARED kit marker as a second `s` (see
 `builder_code.AFFILIATION_MARKER`) so kit-routed payments self-identify on-chain:
 discovery across all sellers is then one query, `WHERE builder_code = <marker>`,
 with no reconstruction and undeployed splits included. The marker never affects a
-payout (the split pays the primary code, i.e. yours); pass `marker=None` to opt out.
+payout (the split pays the primary code, i.e. yours) and is hardcoded and shared
+across every install - not configurable, so kit payments always stay discoverable.
 """
 from __future__ import annotations
 
-from builder_code import AFFILIATION_MARKER, normalize_builder_code
+from builder_code import AFFILIATION_MARKER
 
 
 class BuilderCodeClientExtension:
     """Stamp every payment from this client with your builder code as ``s``.
 
-    A fixed kit marker (:data:`builder_code.AFFILIATION_MARKER`) rides along as a
-    SECOND ``s`` code so kit-routed payments are discoverable on-chain with one
-    query (``WHERE builder_code = <marker>``). It never changes a payout - the
-    split always pays the PRIMARY (first) code, i.e. *your* ``code``. Pass
-    ``marker=None`` (or set ``X402_AFFILIATION_MARKER=``) to opt out.
+    A hardcoded, shared kit marker (:data:`builder_code.AFFILIATION_MARKER`,
+    ``x402aff``) rides along as a SECOND ``s`` code so kit-routed payments are
+    discoverable on-chain with one query (``WHERE builder_code = 'x402aff'``). It
+    never changes a payout - the split always pays the PRIMARY (first) code, i.e.
+    *your* ``code`` - and is deliberately not configurable, so every kit payment
+    stays discoverable ecosystem-wide.
     """
 
     key = "builder-code"
 
-    def __init__(self, code: str, *, marker: str | None = AFFILIATION_MARKER):
+    def __init__(self, code: str):
         self.code = code
-        # Only tag with a valid, distinct marker; never duplicate the real code.
-        self.marker = normalize_builder_code(marker) if marker else None
 
     def enrich_payment_payload(self, payload, payment_required):
+        # Always append the shared, hardcoded marker as a second `s` (never a
+        # duplicate of the real code), so the payment self-identifies on-chain.
         codes = [self.code]
-        if self.marker and self.marker != self.code:
-            codes.append(self.marker)
+        if AFFILIATION_MARKER and AFFILIATION_MARKER != self.code:
+            codes.append(AFFILIATION_MARKER)
         exts = dict(payload.extensions or {})
         exts["builder-code"] = {"info": {"s": codes}}
         return payload.model_copy(update={"extensions": exts})
