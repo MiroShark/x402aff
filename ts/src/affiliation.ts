@@ -65,12 +65,11 @@ const BUILDER_CODE_RE = /^[a-z0-9_]{1,32}$/;
  * `WHERE builder_code = <marker>` in CDP's index - with no split-address
  * reconstruction, and it catches even undeployed splits (written at settle time).
  * It rides alongside the real builder code; the split always pays the PRIMARY
- * (first) code, so the marker never changes a payout. Claim it once so it's yours.
- * Override with X402_AFFILIATION_MARKER (scopes discovery to your marker), or set
- * it to "" to opt out of tagging.
+ * (first) code, so the marker never changes a payout, and needs no registration.
+ * It is HARDCODED and identical across every kit install - that shared constant is
+ * what makes one query discover them all, so it is deliberately not configurable.
  */
-export const AFFILIATION_MARKER: string =
-  (typeof process !== "undefined" ? process.env?.X402_AFFILIATION_MARKER : "") || "x402aff";
+export const AFFILIATION_MARKER = "x402aff";
 
 /**
  * The buyer-side `s` codes to attach: your real builder `code`, plus the kit
@@ -79,8 +78,8 @@ export const AFFILIATION_MARKER: string =
  * `{ "builder-code": { info: { s: markedServiceCodes("bc_you") } } }`. The split
  * still pays the primary code (`code`), so the marker never changes a payout.
  */
-export function markedServiceCodes(code: string, marker: string = AFFILIATION_MARKER): string[] {
-  return marker && BUILDER_CODE_RE.test(marker) && marker !== code ? [code, marker] : [code];
+export function markedServiceCodes(code: string): string[] {
+  return AFFILIATION_MARKER !== code ? [code, AFFILIATION_MARKER] : [code];
 }
 
 /** JSON Schema for the ERC-8021 Schema 2 fields (mirrors builder_code.py). */

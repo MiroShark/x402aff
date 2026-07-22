@@ -131,6 +131,23 @@ directly (Python) and address-prediction + distribute just work - see the
 CLI) discovers every builder who paid you - straight from CDP's index, no local
 ledger - and shows which splits are ready to release, with the `cast` commands.
 
+### Discover every kit payment (any seller)
+
+The buyer extension stamps a hardcoded, shared marker (`x402aff`) as a second `s`,
+so **one** CDP query finds every kit-routed payment across all sellers - undeployed
+splits included, no address reconstruction:
+
+```sql
+SELECT DISTINCT transaction_hash
+FROM base.transaction_attributions
+WHERE builder_code = 'x402aff' AND action = 1;
+```
+
+Run it in the [CDP SQL Playground](https://portal.cdp.coinbase.com/onchain-tools/sql-api),
+or `POST https://api.cdp.coinbase.com/platform/v2/data/query/run` with a CDP JWT
+(`Bearer`). Join those txs to the USDC `Transfer` to recover each payment's split
+and read its claimable balance - see [`queries.sql`](./python/queries.sql) #5 / #5b.
+
 ### Any other language (Go, Rust, …)
 
 It's just three view-calls against two contracts - port
@@ -157,7 +174,7 @@ It's just three view-calls against two contracts - port
 - **`s` is a self-asserted tag** - resolving it says *where* the money goes (the
   code's registered payout), not who's *entitled* to it. Right level for an
   affiliate program.
-- **Kit payments self-identify on-chain.** The buyer extension stamps a fixed,
+- **Kit payments self-identify on-chain.** The buyer extension stamps a hardcoded,
   shared marker code (`x402aff`) as a second `s`, so every kit-routed payment is
   discoverable with **one** query - across all sellers, undeployed splits included -
   and it never changes a payout. See [`INTEGRATION.md`](./docs/INTEGRATION.md).
