@@ -157,6 +157,10 @@ It's just three view-calls against two contracts - port
 - **`s` is a self-asserted tag** - resolving it says *where* the money goes (the
   code's registered payout), not who's *entitled* to it. Right level for an
   affiliate program.
+- **Kit payments self-identify on-chain.** The buyer extension stamps a fixed,
+  shared marker code (`x402aff`) as a second `s`, so every kit-routed payment is
+  discoverable with **one** query - across all sellers, undeployed splits included -
+  and it never changes a payout. See [`INTEGRATION.md`](./docs/INTEGRATION.md).
 
 Full trust model, edge cases, and caveats: [`INTEGRATION.md`](./docs/INTEGRATION.md).
 

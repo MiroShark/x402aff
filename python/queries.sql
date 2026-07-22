@@ -63,3 +63,44 @@ SELECT transaction_hash, arrayJoin(builder_codes) AS builder_code
 FROM base.decoded_user_operations
 WHERE transaction_hash IN ('0xYOUR_SETTLE_TX_HASH_1')
   AND action = 1;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 5. Every kit-routed payment, ECOSYSTEM-WIDE (the AFFILIATION_MARKER path).
+--    The kit's buyer extension stamps a fixed, shared marker code as a second
+--    `s`, so every payment that used this kit self-identifies - no payTo
+--    reconstruction, and it includes splits funded but never deployed. Swap the
+--    marker string if you overrode X402_AFFILIATION_MARKER.
+-- ─────────────────────────────────────────────────────────────────────────────
+SELECT DISTINCT transaction_hash
+FROM base.transaction_attributions
+WHERE builder_code = 'x402aff'
+  AND action = 1;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 5b. …with each payment's payTo (the split) + USDC amount, by joining the
+--     Transfer log on the same tx. Cheap because the marker set is tiny: the
+--     `block_number IN (...)` bound restricts the base.events scan to only the
+--     blocks that carry a marked tx (base.events by USDC alone is ~93 GiB/week).
+--     Group by pay_to for a per-split rollup; the contracts among these are your
+--     kit splits, a direct-to-seller payTo is an EOA (see docs/INTEGRATION.md).
+-- ─────────────────────────────────────────────────────────────────────────────
+SELECT
+  toString(e.parameters['to'])                          AS pay_to,
+  count()                                                AS payments,
+  sum(toUInt256OrZero(toString(e.parameters['value']))) AS total_units
+FROM base.events e
+WHERE e.event_name = 'Transfer'
+  AND lower(e.address) = '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913'
+  AND e.action = 1
+  AND e.transaction_hash IN (
+    SELECT transaction_hash FROM base.transaction_attributions
+    WHERE builder_code = 'x402aff' AND action = 1
+  )
+  AND e.block_number IN (
+    SELECT block_number FROM base.transaction_attributions
+    WHERE builder_code = 'x402aff' AND action = 1
+  )
+GROUP BY pay_to
+ORDER BY total_units DESC;
