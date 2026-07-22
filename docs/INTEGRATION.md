@@ -125,6 +125,30 @@ just read the chain / CDP's index and emit calldata.
 To automate payouts, run `monitor.py` on a schedule and submit the `cast` commands
 it prints from a funded gas key - new code → collect → auto-distribute, hands-off.
 
+### Discovering kit payments across sellers (the marker)
+
+`monitor.py` finds splits for *your* app code. To find every kit-routed payment
+**ecosystem-wide** - across sellers you don't know - the buyer extension stamps a
+fixed, **shared** marker code (`builder_code.AFFILIATION_MARKER`, default
+`x402aff`) as a second `s` on every payment. Because every kit install uses the
+same marker, one query finds them all. It rides alongside the real builder code
+and never changes a payout (the split always pays the primary code), but it makes
+kit payments self-identifying on-chain. Discovery is then a single cheap query
+against CDP's index - no `payTo` reconstruction, and it catches even *undeployed*
+splits (the marker is written at settle time, not at deploy):
+
+```sql
+SELECT DISTINCT transaction_hash
+FROM base.transaction_attributions
+WHERE builder_code = 'x402aff' AND action = 1;
+```
+
+Join those tx hashes to the USDC `Transfer` in `base.events` (bounded by their
+`block_number`, so the scan stays tiny) to recover each payment's `payTo` (the
+split), then read its balance as usual - see `queries.sql` #5. Claim the marker
+code once so it is yours alone. Because `s` is buyer-attached, the marker tags
+payments made through the kit's client extension - exactly the opted-in population.
+
 ## 6. Trust model - be clear-eyed
 
 Because `s` is a self-asserted tag (not part of the buyer's signature), resolving

@@ -58,6 +58,31 @@ const PUBLIC_BASE_RPC = "https://mainnet.base.org";
 export const BUILDER_CODE_PATTERN = "^[a-z0-9_]{1,32}$";
 const BUILDER_CODE_RE = /^[a-z0-9_]{1,32}$/;
 
+/**
+ * The SHARED marker code the kit appends as a SECOND `s` on every payment, so
+ * kit-routed payments self-identify on-chain. Because it is the same across all
+ * kit installs, ONE query discovers every kit payment ecosystem-wide -
+ * `WHERE builder_code = <marker>` in CDP's index - with no split-address
+ * reconstruction, and it catches even undeployed splits (written at settle time).
+ * It rides alongside the real builder code; the split always pays the PRIMARY
+ * (first) code, so the marker never changes a payout. Claim it once so it's yours.
+ * Override with X402_AFFILIATION_MARKER (scopes discovery to your marker), or set
+ * it to "" to opt out of tagging.
+ */
+export const AFFILIATION_MARKER: string =
+  (typeof process !== "undefined" ? process.env?.X402_AFFILIATION_MARKER : "") || "x402aff";
+
+/**
+ * The buyer-side `s` codes to attach: your real builder `code`, plus the kit
+ * marker as a second entry (the marker is dropped if invalid or equal to `code`).
+ * Feed the result to whatever sets the payment's `s`, e.g.
+ * `{ "builder-code": { info: { s: markedServiceCodes("bc_you") } } }`. The split
+ * still pays the primary code (`code`), so the marker never changes a payout.
+ */
+export function markedServiceCodes(code: string, marker: string = AFFILIATION_MARKER): string[] {
+  return marker && BUILDER_CODE_RE.test(marker) && marker !== code ? [code, marker] : [code];
+}
+
 /** JSON Schema for the ERC-8021 Schema 2 fields (mirrors builder_code.py). */
 const BUILDER_CODE_SCHEMA = {
   type: "object",

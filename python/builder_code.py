@@ -25,6 +25,7 @@ The only third-party dependency is `cbor2`, and only for parse_builder_code_suff
 """
 from __future__ import annotations
 
+import os
 import re
 from typing import Any
 
@@ -33,6 +34,17 @@ BUILDER_CODE_KEY = "builder-code"
 
 # Every builder code (a / w / s) is 1-32 lowercase letters, digits, underscores.
 BUILDER_CODE_PATTERN = r"^[a-z0-9_]{1,32}$"
+
+# The SHARED marker code the kit's buyer extension appends as a SECOND `s` on
+# every payment, so kit-routed payments self-identify on-chain. Because it is the
+# same code across all kit installs, ONE query discovers every kit payment
+# ecosystem-wide - `WHERE builder_code = <marker>` in base.transaction_attributions
+# - with no split-address reconstruction, and it catches even UNDEPLOYED splits
+# (the marker is written at settle time, not at deploy). It rides alongside the
+# real builder code; the split always pays the PRIMARY (first) code, so the marker
+# never changes a payout. Override with X402_AFFILIATION_MARKER (which scopes
+# discovery to your own marker), or set it to "" to opt out of tagging entirely.
+AFFILIATION_MARKER = os.environ.get("X402_AFFILIATION_MARKER", "x402aff")
 
 # ERC-8021 Schema 2 trailer (16 bytes) that closes every attribution suffix.
 # Read from the END of the settlement calldata, the suffix is laid out as:

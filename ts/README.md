@@ -54,6 +54,20 @@ client.registerExtension(new BuilderCodeClientExtension("bc_yourcode"));
 // …and send header  X-Builder-Code: bc_yourcode  on the request.
 ```
 
+To make your kit-routed payments **discoverable on-chain** (across all sellers, one
+query), attach the shared kit marker as a second `s` code - it never changes a
+payout, since the split pays the primary code:
+
+```ts
+import { markedServiceCodes, AFFILIATION_MARKER } from "./src/affiliation.ts";
+// s becomes ["bc_yourcode", AFFILIATION_MARKER]; the split still pays bc_yourcode.
+const info = { "builder-code": { info: { s: markedServiceCodes("bc_yourcode") } } };
+// …register an extension that sets this `info` (or pass both codes to one that
+//   accepts multiple). Discovery: settlements whose `s` includes AFFILIATION_MARKER.
+```
+
+See [`../docs/INTEGRATION.md`](../docs/INTEGRATION.md) and [`../python/queries.sql`](../python/queries.sql) #5.
+
 ## Develop
 
 ```bash
