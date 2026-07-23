@@ -7,7 +7,7 @@ fake money (`deal`), real contracts - no keys, no funds, nothing broadcast.
 ```bash
 cd fork-test
 forge install foundry-rs/forge-std     # first time only
-forge test -vv                         # 2 tests; ~2s warm, longer on a cold fork
+forge test -vv                         # 7 tests; ~6s warm, longer on a cold fork
 ```
 
 ## What it pins down
@@ -32,6 +32,24 @@ It also pins the payout math. Splits v2 retains 1 base unit (warm-slot gas
 optimization) and floors each share, so a $1.00 payment pays **$0.099999 /
 $0.899999** - mirrored by `split.amounts_units()` so the ledger reconciles to the
 unit.
+
+**`SplitAbuse.t.sol`** - the adversarial half: once USDC lands in the split, can
+*anyone* redirect, skim, or grief it? Each test actively tries and fails, so
+"only the baked-in recipients (builder + seller) can ever be paid, at the baked
+ratio" holds against a motivated attacker - not just on the happy path.
+
+| Test | Attack it defeats |
+|---|---|
+| `test_tamperedDistributeStructReverts` | calling `distribute` with a tampered `Split` (swap in the attacker, flip the allocations, add a skim incentive) reverts - the wallet hash-checks the struct; not one unit moves |
+| `test_tamperedParamsResolveToADifferentAddress` | a malicious split paying the attacker resolves to a **different** CREATE2 address, so the funded address never holds their variant |
+| `test_anyCallerTriggersButOnlyBakedRecipientsGetPaid` | `distribute` is permissionless but the caller/named distributor earns **0** (`distributionIncentive = 0`); only builder/seller are paid |
+| `test_noOwnerLeversForAnyone` | the split is ownerless, so `updateSplit` / `setPaused` revert for **everyone** - including the seller trying to claw back or freeze the cut |
+| `test_frontRunningTheDeployChangesNothing` | front-running the deterministic deploy (attacker as creator) lands the same address with the same recipients; `distribute` still pays builder/seller |
+
+The two-layer lock behind these: the split **address is CREATE2 over the params**
+(so funds only accrue at the address for exactly those recipients), and
+`distribute` **re-validates the struct against the hash stored at creation** (so
+even at the funded address the money can't go anywhere else).
 
 ## Regenerating the calldata
 
