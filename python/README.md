@@ -1,6 +1,6 @@
-# x402 affiliation kit - Python
+# x402aff - Python
 
-The Python kit: a set of flat modules that import each other by bare name, with
+The x402aff kit (Python): a set of flat modules that import each other by bare name, with
 the one-object [`affiliation.py`](./affiliation.py) facade on top. This is the
 implementation validated end-to-end on Base mainnet.
 

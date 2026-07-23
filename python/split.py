@@ -4,7 +4,7 @@ Given a builder code and the price, this resolves *who* to pay and produces the
 *split plan*: the recipient set + basis-point allocations (builder cut + seller
 remainder) that a per-(seller, builder) 0xSplits PushSplit encodes.
 
-It's the pure-arithmetic half of the kit's enforced payout: ``push_split.py``
+It's the pure-arithmetic half of the x402aff kit's enforced payout: ``push_split.py``
 turns a plan into on-chain calldata, and ``payto.py`` sets the route's ``payTo``
 to the plan's split so the CDP facilitator settles straight into it. Address
 resolution reuses ``resolver`` (only needs ``requests``); this module itself is

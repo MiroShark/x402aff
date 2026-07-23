@@ -12,11 +12,11 @@ forge test -vv                         # 2 tests; ~2s warm, longer on a cold for
 
 ## What it pins down
 
-**`CdpPath.t.sol`** - the exact path the kit uses in production: the stock CDP
+**`CdpPath.t.sol`** - the exact path the x402aff kit uses in production: the stock CDP
 facilitator settles a **plain USDC transfer** to `payTo` (= the per-pair split),
 then anyone releases it. The hex blobs are verbatim output of
 `push_split.create_split_calldata` / `distribute_calldata` / `is_deployed_calldata`
-- nothing here re-implements the kit's encoding.
+- nothing here re-implements the x402aff kit's encoding.
 
 | Test | Asserts |
 |---|---|

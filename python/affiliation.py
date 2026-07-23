@@ -1,6 +1,6 @@
 """One object that is the whole integration - declare, payTo, distribute.
 
-The kit's pieces (`builder_code`, `payto`, `split`, `push_split`, `distribute`,
+The x402aff kit's pieces (`builder_code`, `payto`, `split`, `push_split`, `distribute`,
 `monitor`) each do one job well, but wiring an x402 route means importing several
 and hand-rolling a ``payTo`` callback. This folds all of that behind a single
 configured object so the integration is a couple of lines.
@@ -61,7 +61,7 @@ class Affiliation:
         Where your 90% (and every unattributed payment) is paid.
     builder_share_bps
         The builder's cut in basis points (``1000`` = 10%). ``None`` uses
-        ``X402_BUILDER_SHARE_BPS`` / the kit default.
+        ``X402_BUILDER_SHARE_BPS`` / the x402aff kit default.
     rpc_url
         Base RPC for the address/balance reads. ``None`` uses ``X402_BASE_RPC`` /
         the public endpoint (which rate-limits - set a paid one in production).
