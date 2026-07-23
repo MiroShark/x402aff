@@ -1,12 +1,12 @@
 /**
  * One object that is the whole integration - declare, payTo, distribute.
  *
- * A TypeScript port of the kit's Python `Affiliation` facade (affiliation.py),
+ * A TypeScript port of the x402aff kit's Python `Affiliation` facade (affiliation.py),
  * for x402 sellers running the Node / TS reference stack. Same three on-chain
  * reads, same safe-fallback contract, same surface:
  *
  * ```ts
- * import { Affiliation } from "@x402-affiliation/kit";
+ * import { Affiliation } from "x402aff";
  *
  * const aff = new Affiliation({ appCode: "bc_yourcode", sellerPayout: "0x…" });
  *
@@ -93,7 +93,7 @@ const BUILDER_CODE_SCHEMA = {
   additionalProperties: false,
 } as const;
 
-// ── ABIs (only the functions this kit calls) ─────────────────────────────────
+// ── ABIs (only the functions the x402aff kit calls) ──────────────────────────
 const SPLIT_STRUCT = {
   name: "split",
   type: "tuple",

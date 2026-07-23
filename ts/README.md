@@ -1,4 +1,4 @@
-# @x402-affiliation/kit (TypeScript)
+# x402aff (TypeScript)
 
 The `Affiliation` facade for x402 sellers on the **Node / TypeScript** stack - a
 port of the repo's Python [`affiliation.py`](../python/affiliation.py). Same three

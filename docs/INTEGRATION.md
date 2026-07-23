@@ -1,6 +1,6 @@
 # Enforced Affiliation - Integration Guide
 
-How to wire the kit into your own x402 stack so the affiliate cut is **split
+How to wire the x402aff kit into your own x402 stack so the affiliate cut is **split
 on-chain, at settlement**, with **no facilitator of your own to run**. This is the
 path validated on Base mainnet and reproducible on a mainnet fork (see
 [`../fork-test/`](../fork-test)).

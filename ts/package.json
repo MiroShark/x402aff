@@ -1,5 +1,5 @@
 {
-  "name": "@x402-affiliation/kit",
+  "name": "x402aff",
   "version": "0.1.0",
   "description": "Builder-code affiliation for x402 sellers - the Affiliation facade (TypeScript port of affiliation.py).",
   "type": "module",

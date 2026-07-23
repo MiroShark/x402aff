@@ -1,4 +1,6 @@
-# x402 Builder-Code Affiliation Kit
+# x402aff
+
+Builder-code affiliation for x402 sellers.
 
 **Give the apps that send you paying users a cut - enforced on-chain, at
 settlement, with no facilitator of your own to run.**
@@ -35,7 +37,7 @@ Turn your x402 endpoint into an **affiliate program** with no backend for it:
 
 Base [Builder Codes](https://docs.cdp.coinbase.com/x402/core-concepts/builder-codes)
 put three tags on a paid request: **`a`** (you, the API), **`s`** (the builder that
-drove it), **`w`** (the facilitator). The kit turns `s` into money with one move:
+drove it), **`w`** (the facilitator). The x402aff kit turns `s` into money with one move:
 
 **Set the route's `payTo` to a per-`(you, builder)` 0xSplits split.** The buyer's
 app names its builder on the request; the CDP facilitator settles straight into
@@ -67,7 +69,7 @@ code at [base.dev](https://base.dev) → *Settings → Builder Codes*, then:
 ### TypeScript / Node → [`ts/`](./ts) · guide: [`ts/README.md`](./ts/README.md)
 
 ```ts
-import { Affiliation } from "@x402-affiliation/kit";
+import { Affiliation } from "x402aff";
 
 const aff = new Affiliation({ appCode: "bc_yourcode", sellerPayout: "0x…" });
 
@@ -166,7 +168,7 @@ It's just three view-calls against two contracts - port
 ## Good to know
 
 - **Mainnet + CDP only.** Attribution is written on Base mainnet via the CDP
-  facilitator; the registry/factory this kit reads only exist there.
+  facilitator; the registry/factory the x402aff kit reads only exist there.
 - **Use a paid RPC.** Set `X402_BASE_RPC` - the public one `429`s, and a failed
   resolve silently falls back to your wallet (unsplit).
 - **Distribute costs a few cents of gas** (the buyer's payment is gasless). Payouts

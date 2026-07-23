@@ -22,7 +22,7 @@ owner == the builder. Either way, `payout_address` is the meaningful recipient -
 always pay that.
 
 This module speaks raw JSON-RPC `eth_call` (only needs `requests`), so it drops
-into the affiliation kit with no web3 dependency. Point it at any Base RPC.
+into the x402aff kit with no web3 dependency. Point it at any Base RPC.
 
 Verified live: leap_wallet → owner 0xf9d7…8116, payout 0xa06c…54c8.
 """
