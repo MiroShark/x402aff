@@ -112,6 +112,24 @@ def test_failure_is_not_cached(monkeypatch):
     assert r.attributed and r.split_deployed
 
 
+def test_unregistered_is_not_cached(monkeypatch):
+    # First lookup resolves fine but the code isn't registered yet → seller.
+    # (predict is _boom to prove we never predict an address for an empty plan.)
+    monkeypatch.setattr(
+        split, "resolve_and_plan",
+        lambda *a, **k: split.build_split_plan(SELLER, None, builder_code="bc_late"),
+    )
+    monkeypatch.setattr(push_split, "predict_split_address", _boom)
+    first = payto.payto_for_request("bc_late", seller_payout=SELLER)
+    assert first.address == SELLER and not first.attributed
+    # The builder registers later; the next request must pick up the split, not a
+    # stale cached miss (which would silently strand their cut for the process life).
+    monkeypatch.setattr(split, "resolve_and_plan", _plan_with_builder)
+    monkeypatch.setattr(push_split, "predict_split_address", lambda plan, **k: (SPLIT, False))
+    second = payto.payto_for_request("bc_late", seller_payout=SELLER)
+    assert second.attributed and second.address == SPLIT
+
+
 # ── distribute leg selection ──────────────────────────────────────────────────
 
 def test_distribute_calls_include_deploy_when_undeployed():
