@@ -185,6 +185,63 @@ Full trust model, edge cases, and caveats: [`INTEGRATION.md`](./docs/INTEGRATION
 
 ---
 
+## Security
+
+**The kit deploys no contracts of its own.** It authors nothing on-chain - it only
+*reads* two canonical, third-party contracts and lets the stock CDP facilitator
+settle into them. There's no new on-chain attack surface to audit here; the money
+is held and split by code that already exists and is already audited.
+
+- **0xSplits PushSplit** (`SplitFactoryV2` / `SplitWalletV2`, factory
+  `0x8E8e…Ecf4`) holds each payment and splits it. Splits V2 was audited by **Zach
+  Obront** (independent security researcher) ahead of its **May 2024** mainnet
+  launch - report:
+  [`splits-contracts-monorepo/audits/splits-v2.md`](https://github.com/0xSplits/splits-contracts-monorepo/blob/main/audits/splits-v2.md).
+  The kit creates every split **ownerless** (`owner = 0`) and immutable, so once
+  USDC lands, the ratio is fixed and nobody - not even the seller - can redirect,
+  pause, or claw back the builder's cut.
+- **Base Builder Codes registry** (`0x000000BC…C8E80`) maps each builder code to
+  the payout address its owner registered. The kit only reads it, so a builder's
+  cut can only ever go to the address that builder registered.
+
+### What the split guarantees - proven against live mainnet
+
+Money in a split can only ever be paid to the two baked-in recipients (builder +
+seller) at the baked ratio, no matter who calls anything. This isn't asserted,
+it's tested: the Foundry suite in [`fork-test/`](./fork-test) forks Base mainnet
+and runs **7 tests** - including **5 adversarial** ones in
+[`SplitAbuse.t.sol`](./fork-test/test/SplitAbuse.t.sol) that actively try to break
+it and fail:
+
+| Attack tried against a funded split | Result |
+|---|---|
+| Trigger `distribute` yourself, name yourself the distributor | builder 10% / seller 90%; you get **0** (`distributionIncentive = 0`) |
+| `distribute` with a tampered struct (swap recipient / flip ratio / add a skim) | **reverts** - the wallet hash-checks the struct; nothing moves |
+| Deploy a hijacking split that pays you, at the funded address | **impossible** - different params → different CREATE2 address, no funds there |
+| `updateSplit` / `setPaused` to redirect or freeze (seller *or* attacker) | **reverts** - the split is ownerless |
+| Front-run the deterministic deploy | same address, same recipients; still pays builder/seller |
+
+The two-layer lock behind this: the split **address is CREATE2 over its params**
+(funds only ever accrue at the address for exactly those recipients), and
+`distribute` **re-validates the passed struct against the hash stored at creation**
+(so even at that address the money can't go anywhere else).
+
+### What this is *not*
+
+`s` is a self-asserted tag, not a signed proof of who drove a payment - resolving
+it says *where* the money goes (the code's registered payout), not who is
+*entitled* to it. That's the right level for an affiliate program, but it's a
+routing opt-in, not trustless attribution. And a resolve failure (or an unknown
+code) always falls back to the seller wallet - the payment never fails, it just
+isn't split. Full trust model: [`INTEGRATION.md` §6](./docs/INTEGRATION.md).
+
+**No keys, no custody.** The kit never holds funds or signs anything: `payTo` is
+just an address in the 402, settlement is the buyer's gasless CDP payment, and
+`distribute` is a permissionless call anyone pays gas for. Nothing here needs a
+private key.
+
+---
+
 ## What's in the box
 
 | Path | What it is |

@@ -64,10 +64,12 @@ class PayTo:
     error: Optional[str] = None
 
 
-#: (code, seller, share_bps) → PayTo. A pair's split address is deterministic
-#: (CREATE2, salt=0) and a registered payout address effectively never changes,
-#: so this is safe to hold for the process lifetime. Keeps the 402 path to zero
-#: RPC round-trips after the first request from each builder.
+#: (code, seller, share_bps) → PayTo. Only *positive* (attributed) resolutions
+#: are cached: a pair's split address is deterministic (CREATE2, salt=0) and a
+#: registered payout effectively never changes, so it's safe to hold for the
+#: process lifetime. An unregistered code (or a lookup error) is never cached, so
+#: a builder who registers after their first request isn't stranded on a stale
+#: miss. Keeps the 402 path to zero RPC round-trips once a builder is resolved.
 _CACHE: dict[tuple[str, str, int], PayTo] = {}
 
 
@@ -133,11 +135,12 @@ def payto_for_request(
             rpc_url=rpc_url or resolver.DEFAULT_RPC,
         )
         if not plan.has_builder:
-            # Resolved fine, just nobody home. Cacheable.
-            result = PayTo(seller, plan, False, False)
-            if use_cache:
-                _CACHE[key] = result
-            return result
+            # Resolved fine, but this code isn't registered *yet*. Deliberately
+            # NOT cached: the builder may register later, and a cached miss would
+            # strand their cut (route to the seller, unsplit) for the whole
+            # process life - and a valid-format unknown code could even be used to
+            # prime it. Only positive resolutions are memoized (see below).
+            return PayTo(seller, plan, False, False)
 
         address, deployed = push_split.predict_split_address(plan, rpc_url=rpc_url)
         result = PayTo(address, plan, deployed, True)

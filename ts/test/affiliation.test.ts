@@ -208,6 +208,32 @@ test("a network failure falls back to seller AND records the error", async () =>
   assert.ok(pt.error && /boom|RPC/i.test(pt.error));
 });
 
+test("an unregistered result is NOT cached (builder registers later, gets picked up)", async () => {
+  // Registry answers "unregistered" first, then "registered" - as if the builder
+  // registers their code after their first payment. A cached miss would strand
+  // their cut for the process life; only positive resolutions are memoized.
+  let registered = false;
+  const transport = custom({
+    async request({ method, params }: { method: string; params: any }) {
+      if (method === "eth_chainId") return "0x2105";
+      const to = String(params[0].to).toLowerCase();
+      if (to === BUILDER_CODES_REGISTRY.toLowerCase()) return registered ? "0x" + word(BUILDER) : "0x";
+      if (to === SPLITS_PUSH_FACTORY.toLowerCase()) return "0x" + word(SPLIT) + uintWord(0n);
+      return "0x" + uintWord(0n);
+    },
+  });
+  const a = aff(createPublicClient({ chain: base, transport }) as PublicClient);
+
+  const first = await a.resolve("bc_late");
+  assert.equal(first.attributed, false); // not registered yet → seller, unsplit
+  assert.equal(first.address, SELLER);
+
+  registered = true;
+  const second = await a.resolve("bc_late");
+  assert.equal(second.attributed, true); // now resolves - not stuck on a cached miss
+  assert.equal(second.address.toLowerCase(), SPLIT);
+});
+
 // ── facade: payout path ───────────────────────────────────────────────────────
 
 test("balance reads the split's USDC balance", async () => {

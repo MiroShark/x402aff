@@ -324,6 +324,9 @@ export class Affiliation {
   readonly sellerPayout: Address;
   readonly builderShareBps: number;
   private readonly client: PublicClient;
+  /** code|bps → PayTo. Only *positive* (attributed) resolutions are cached; an
+   *  unregistered code and a lookup error are never cached, so a builder who
+   *  registers after their first request isn't stranded on a stale miss. */
   private readonly cache = new Map<string, PayTo>();
   private _extensions?: Record<string, unknown>;
 
@@ -387,9 +390,13 @@ export class Affiliation {
       const payout = await this.payoutOf(code);
       const plan = buildSplitPlan(this.sellerPayout, payout, code, this.builderShareBps);
       if (!plan.hasBuilder) {
-        const pt: PayTo = { address: this.sellerPayout, attributed: false, splitDeployed: false, plan };
-        this.cache.set(key, pt);
-        return pt;
+        // Resolved fine, but this code isn't registered *yet*. Deliberately NOT
+        // cached: the builder may register later, and a cached miss would strand
+        // their cut (route to the seller, unsplit) for the whole process life -
+        // and a valid-format unknown code could even be used to prime it. Only
+        // positive resolutions (immutable: registered payout + CREATE2 address)
+        // are memoized.
+        return { address: this.sellerPayout, attributed: false, splitDeployed: false, plan };
       }
       const [address, deployed] = await this.predictSplitAddress(plan);
       const pt: PayTo = { address, attributed: true, splitDeployed: deployed, plan };
