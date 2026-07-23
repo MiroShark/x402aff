@@ -17,7 +17,6 @@ from builder_code import (
     parse_builder_code_suffix,
 )
 
-
 # --- declare_builder_code: the "declare it" step ------------------------------
 
 def test_declares_app_code_under_correct_key():

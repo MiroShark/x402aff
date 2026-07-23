@@ -37,8 +37,8 @@ import os
 from dataclasses import dataclass
 from typing import Optional
 
-import resolver
 import push_split
+import resolver
 import split
 
 # The header a buyer's client sets on the unpaid request. Same grammar as `s`.

@@ -19,14 +19,13 @@ RPC (set X402_BASE_RPC to a paid one - the balance reads add up).
 from __future__ import annotations
 
 import os
-import sys
 from dataclasses import dataclass
 from typing import Optional
 
 import cdp_sql
 import distribute
-import resolver
 import push_split
+import resolver
 import split
 
 APP_CODE = os.environ.get("X402_BUILDER_CODE", "")

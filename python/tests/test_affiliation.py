@@ -9,11 +9,9 @@ from __future__ import annotations
 
 import asyncio
 
-import affiliation
-import payto
+import distribute
 import push_split
 import resolver
-import distribute
 from affiliation import Affiliation
 from builder_code import declare_builder_code
 
