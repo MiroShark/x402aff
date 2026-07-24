@@ -137,13 +137,17 @@ ledger - and shows which splits are ready to release, with the `cast` commands.
 
 One call returns every per-builder split for your seller, ready to serialize
 behind a `GET /splits` route: each row has the split address, codes + share, live
-balance, deployed state, payment count / received total, and a permissionless
-`[deploy?, distribute]` claim. Because it reconstructs from the seller wallet the
-facade already holds, it covers **undeployed** splits too (a counterfactual
-address can't be resolved seller-side from the chain otherwise). Discovery is by
-your app code `a` via CDP (Python bundles it; TS takes an injected `query` runner
-so the kit stays viem-only). Mount it in one line and render the rows however you
-like - the claim calls are permissionless, so anyone can trigger them.
+balance, deployed state, and a permissionless `[deploy?, distribute]` claim.
+Because it reconstructs from the seller wallet the facade already holds, it
+covers **undeployed** splits too (a counterfactual address can't be resolved
+seller-side from the chain otherwise). Discovery is by your app code `a` via CDP
+(Python bundles it; TS takes an injected `query` runner so the kit stays
+viem-only). Mount it in one line and render the rows however you like - the claim
+calls are permissionless, so anyone can trigger them.
+
+There is deliberately **no per-split payment count**: the only query that could
+produce one joins `base.events` and trips the CDP SQL API's leaf-scan limit, so
+it 400s. See `python/queries.sql` #5b before trying to add it back.
 
 ```python
 @app.get("/splits")                       # Python (Flask)

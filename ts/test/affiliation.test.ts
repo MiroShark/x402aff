@@ -274,14 +274,15 @@ test("a custom builder share changes the split address it resolves", async () =>
   assert.notEqual(isDeployedCalldata(p10), isDeployedCalldata(p25));
 });
 
-test("splitsPayload shapes rows, filters the marker, and joins the rollup", async () => {
+test("splitsPayload shapes rows and filters the marker", async () => {
   const a = aff(mockClient({ payout: BUILDER, deployed: false, balance: 1_000_000n }));
-  // Injected CDP query: branch on the SQL. The marker rides along as a "builder"
-  // and must be dropped; the app code + facilitator are dropped by discover.
+  // Injected CDP query. The marker rides along as a "builder" and must be
+  // dropped; the app code + facilitator are dropped by discover.
   const query = async (sql: string) => {
-    if (sql.includes("base.events")) {
-      return [{ pay_to: SPLIT.toLowerCase(), payments: 3, received: "3000000" }];
-    }
+    // Regression: the per-split payments/received rollup joined base.events and
+    // tripped the CDP SQL API's leaf-scan limit (400) on every call - see
+    // queries.sql #5b. splitsPayload must never issue that query.
+    assert.ok(!sql.includes("base.events"), "splitsPayload ran an unexpected base.events query");
     return [
       { builder_code: "bc_alice" },
       { builder_code: "x402aff" },
@@ -297,10 +298,11 @@ test("splitsPayload shapes rows, filters the marker, and joins the rollup", asyn
   assert.equal(s.payTo.toLowerCase(), SPLIT.toLowerCase());
   assert.equal(s.sellerCode, "bc_seller");
   assert.equal(s.builderCode, "bc_alice");
-  assert.equal(s.payments, 3);
-  assert.equal(s.receivedUnits, "3000000");
   assert.equal(s.balanceUnits, "1000000");
   assert.equal(s.deployed, false);
   assert.equal(s.claimable, true);
   assert.deepEqual(s.calls.map((c) => c.step), ["deploy_split", "distribute"]);
+  // The fields only the dead rollup could populate must stay gone.
+  assert.ok(!("payments" in s));
+  assert.ok(!("receivedUnits" in s));
 });

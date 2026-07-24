@@ -223,11 +223,14 @@ class Affiliation:
         ready to serialize to JSON. One reusable call behind a ``/splits`` route.
 
         Each row carries the split address, its codes + share, live balance,
-        deployed state, payment count / received total, and a permissionless
-        ``[deploy?, distribute]`` claim. Discovery is by our app code ``a`` (CDP);
-        the claim is reconstructed from the seller wallet THIS facade holds, so
-        even undeployed splits build with no guessing. The shared marker and any
-        unregistered/​unresolvable builder code are skipped.
+        deployed state, and a permissionless ``[deploy?, distribute]`` claim.
+        Discovery is by our app code ``a`` (CDP); the claim is reconstructed from
+        the seller wallet THIS facade holds, so even undeployed splits build with
+        no guessing. The shared marker and any unregistered/​unresolvable builder
+        code are skipped.
+
+        No per-split payment count: see queries.sql #5b for why that rollup is
+        not served from the CDP SQL API.
 
         Needs ``cdp-sdk`` (discovery) + a Base RPC (balances). Returns a dict:
         ``{"configured": True, "marker": ..., "count": N, "splits": [...]}``.
@@ -238,8 +241,6 @@ class Affiliation:
             c for c in monitor.discover_builder_codes(self.app_code, days=days)
             if c != AFFILIATION_MARKER
         ]
-        rollup = monitor.discover_split_rollup(self.app_code, days=days)
-
         splits = []
         for code in codes:
             pt = self.resolve(code=code)
@@ -247,14 +248,11 @@ class Affiliation:
                 continue
             # resolve() is memoized, so release() reuses it (one set of reads/code).
             calls, balance = self.release(code)
-            payments, received = rollup.get(pt.address.lower(), (0, 0))
             splits.append({
                 "payTo": pt.address,
                 "sellerCode": self.app_code,
                 "builderCode": code,
                 "builderShareBps": self._share,
-                "payments": payments,
-                "receivedUnits": str(received),
                 "balanceUnits": str(balance),
                 # deployed = no deploy leg needed (the split contract already exists).
                 "deployed": not any(c.step == "deploy_split" for c in calls),

@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import asyncio
 
+import pytest
+
 import distribute
 import push_split
 import resolver
@@ -161,17 +163,15 @@ def test_release_skips_deploy_when_already_deployed(monkeypatch):
     assert [c.step for c in calls] == ["distribute"]
 
 
-def test_splits_payload_shapes_rows_filters_marker_and_joins_rollup(monkeypatch):
+def test_splits_payload_shapes_rows_and_filters_marker(monkeypatch):
     import monitor
 
     _patch_registered(monkeypatch, deployed=False, balance=1_000_000)
-    # Discovery + rollup are CDP-backed; stub them. The shared marker rides along
-    # as a "builder" and must be dropped; the app code + facilitator are already
+    # Discovery is CDP-backed; stub it. The shared marker rides along as a
+    # "builder" and must be dropped; the app code + facilitator are already
     # filtered by discover_builder_codes.
     monkeypatch.setattr(monitor, "discover_builder_codes",
                         lambda app_code, **kw: ["bc_alice", "x402aff"])
-    monkeypatch.setattr(monitor, "discover_split_rollup",
-                        lambda app_code, **kw: {SPLIT.lower(): (3, 3_000_000)})
 
     payload = _aff().splits_payload()
     assert payload["configured"] is True
@@ -181,12 +181,30 @@ def test_splits_payload_shapes_rows_filters_marker_and_joins_rollup(monkeypatch)
     assert s["payTo"] == SPLIT
     assert s["sellerCode"] == "bc_seller"
     assert s["builderCode"] == "bc_alice"
-    assert s["payments"] == 3               # joined from the rollup
-    assert s["receivedUnits"] == "3000000"
     assert s["balanceUnits"] == "1000000"
     assert s["deployed"] is False
     assert s["claimable"] is True
     assert [c["step"] for c in s["calls"]] == ["deploy_split", "distribute"]
+
+
+def test_splits_payload_makes_no_base_events_query(monkeypatch):
+    """Regression: the per-split payments/received rollup joined base.events and
+    tripped the CDP SQL API's leaf-scan limit (400) on every call - see
+    queries.sql #5b. splits_payload must issue no such query, and must not
+    resurrect the fields that only that query could populate."""
+    import monitor
+
+    _patch_registered(monkeypatch, deployed=False, balance=1_000_000)
+    monkeypatch.setattr(monitor, "discover_builder_codes",
+                        lambda app_code, **kw: ["bc_alice"])
+    # Any CDP SQL beyond the stubbed discovery is a reintroduced rollup.
+    monkeypatch.setattr(monitor.cdp_sql, "run_query",
+                        lambda *a, **kw: pytest.fail("splits_payload ran an unexpected CDP query"))
+
+    s = _aff().splits_payload()["splits"][0]
+    assert "payments" not in s
+    assert "receivedUnits" not in s
+    assert not hasattr(monitor, "discover_split_rollup")
 
 
 def test_resolve_failure_falls_back_and_logs(monkeypatch, caplog):

@@ -80,14 +80,26 @@ WHERE builder_code = 'x402aff'
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 5b. …with each payment's payTo (the split) + USDC amount, by joining the
---     Transfer log on the same tx. Cheap because the marker set is tiny: the
---     `block_number IN (...)` bound restricts the base.events scan to only the
---     blocks that carry a marked tx (base.events by USDC alone is ~93 GiB/week).
---     Group by pay_to for a per-split rollup; the contracts among these are your
---     kit splits, a direct-to-seller payTo is an EOA (see docs/INTEGRATION.md).
---     The kit runs this SCOPED to one seller (WHERE builder_code = your `a`, not
---     the marker) in monitor.discover_split_rollup — the payments/received counts
---     behind aff.splits_payload() / the /splits dashboard route.
+--     Transfer log on the same tx. Group by pay_to for a per-split rollup; the
+--     contracts among these are your kit splits, a direct-to-seller payTo is an
+--     EOA (see docs/INTEGRATION.md).
+--
+--     ⚠ DOES NOT RUN ON THE CDP SQL API TODAY - kept here for the Playground /
+--     future reference only. The intent was that `block_number IN (...)` would
+--     restrict the base.events scan to only the blocks carrying a marked tx, but
+--     the planner does not push that bound down: the query still scans base.events
+--     by USDC (~93 GiB/week) and trips the API's 93 GiB leaf-scan limit, so the
+--     endpoint returns 400. Observed live on Base mainnet 2026-07-24 against a
+--     real seller, in BOTH scopes (the shared marker above, and `builder_code =
+--     your own \`a\`), with and without an added block_timestamp bound.
+--
+--     This is why `aff.splits_payload()` carries NO per-split payment count: the
+--     kit used to run this scoped to one seller in monitor.discover_split_rollup,
+--     and it 400'd on every call. Do not reintroduce it without first confirming
+--     against the live API. If you want a payment count, derive it from
+--     base.transaction_attributions alone (cheap, no events join) - that gives
+--     you a per-builder-code count but not the received USDC amount, which only
+--     exists in the Transfer log.
 -- ─────────────────────────────────────────────────────────────────────────────
 SELECT
   toString(e.parameters['to'])                          AS pay_to,
