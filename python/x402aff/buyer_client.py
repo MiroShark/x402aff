@@ -23,7 +23,7 @@ across every install - not configurable, so kit payments always stay discoverabl
 """
 from __future__ import annotations
 
-from builder_code import AFFILIATION_MARKER
+from .builder_code import AFFILIATION_MARKER
 
 
 class BuilderCodeClientExtension:

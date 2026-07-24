@@ -83,7 +83,7 @@ Only dependency: `viem`.
 ### Python → [`python/`](./python) · guide: [`INTEGRATION.md`](./docs/INTEGRATION.md)
 
 ```python
-from affiliation import Affiliation
+from x402aff import Affiliation
 
 aff = Affiliation(app_code="bc_yourcode", seller_payout=YOUR_WALLET)
 
@@ -129,7 +129,7 @@ directly (Python) and address-prediction + distribute just work - see the
 
 ### Release payouts
 
-`distribute` is permissionless. `aff.pending()` (or [`monitor.py`](./python/monitor.py) as a
+`distribute` is permissionless. `aff.pending()` (or [`monitor.py`](./python/x402aff/monitor.py) as a
 CLI) discovers every builder who paid you - straight from CDP's index, no local
 ledger - and shows which splits are ready to release, with the `cast` commands.
 
@@ -148,7 +148,7 @@ calls are permissionless, so anyone can trigger them.
 There is deliberately **no per-split payment count**: producing one alongside the
 received USDC amount means joining `base.events`, which trips the CDP SQL API's
 leaf-scan limit (measured 94.44 GiB against a 93.13 GiB cap) and 400s. If you
-want just the count, `python/queries.sql` #5c gets it from the attribution table
+want just the count, `python/x402aff/queries.sql` #5c gets it from the attribution table
 alone - no join, and confirmed working. #5b documents why the amount can't come
 cheaply.
 
@@ -176,12 +176,12 @@ WHERE builder_code = 'x402aff' AND action = 1;
 Run it in the [CDP SQL Playground](https://portal.cdp.coinbase.com/onchain-tools/sql-api),
 or `POST https://api.cdp.coinbase.com/platform/v2/data/query/run` with a CDP JWT
 (`Bearer`). Join those txs to the USDC `Transfer` to recover each payment's split
-and read its claimable balance - see [`queries.sql`](./python/queries.sql) #5 / #5b.
+and read its claimable balance - see [`queries.sql`](./python/x402aff/queries.sql) #5 / #5b.
 
 ### Any other language (Go, Rust, …)
 
 It's just three view-calls against two contracts - port
-[`ts/src/affiliation.ts`](./ts/src/affiliation.ts) or [`python/affiliation.py`](./python/affiliation.py):
+[`ts/src/affiliation.ts`](./ts/src/affiliation.ts) or [`python/x402aff/affiliation.py`](./python/x402aff/affiliation.py):
 
 1. **code → payout** - `payoutAddress(uint256)` on the registry
    `0x000000BC7E6457e610fe52Dcc0ca5b3ce59C8E80` (token id = the code's ASCII bytes

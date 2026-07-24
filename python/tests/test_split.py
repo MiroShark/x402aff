@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pytest
 
-import split
+from x402aff import split
 
 SELLER = "0xSeller00000000000000000000000000000000"
 BUILDER = "0xBuilderAlice000000000000000000000000000"

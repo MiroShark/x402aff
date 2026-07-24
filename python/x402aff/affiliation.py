@@ -5,7 +5,7 @@ The x402aff kit's pieces (`builder_code`, `payto`, `split`, `push_split`, `distr
 and hand-rolling a ``payTo`` callback. This folds all of that behind a single
 configured object so the integration is a couple of lines.
 
-    from affiliation import Affiliation
+    from x402aff import Affiliation
 
     aff = Affiliation(app_code="bc_yourcode", seller_payout="0x…")
 
@@ -37,12 +37,8 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-import distribute
-import payto
-import push_split
-import resolver
-import split
-from builder_code import AFFILIATION_MARKER, declare_builder_code
+from . import distribute, payto, push_split, resolver, split
+from .builder_code import AFFILIATION_MARKER, declare_builder_code
 
 log = logging.getLogger("affiliation")
 
@@ -191,7 +187,7 @@ class Affiliation:
         Needs ``cdp-sdk`` - discovery uses CDP's attribution index (no local
         ledger). Returns ``monitor.SplitStatus`` rows.
         """
-        import monitor  # lazy: only this path needs cdp_sql / cdp-sdk
+        from . import monitor  # lazy: only this path needs cdp_sql / cdp-sdk
 
         codes = monitor.discover_builder_codes(self.app_code, days=days)
         rows = [self._status_for(c) for c in codes]
@@ -205,7 +201,7 @@ class Affiliation:
     def _status_for(self, code: str):
         """One builder's split status at THIS facade's share (keeps the predicted
         address consistent with what :meth:`pay_to` advertises)."""
-        import monitor
+        from . import monitor
 
         info = resolver.resolve(code, rpc_url=self.rpc_url or push_split.BASE_RPC)
         payout = info.get("payout_address") if info.get("registered") else None
@@ -235,7 +231,7 @@ class Affiliation:
         Needs ``cdp-sdk`` (discovery) + a Base RPC (balances). Returns a dict:
         ``{"configured": True, "marker": ..., "count": N, "splits": [...]}``.
         """
-        import monitor  # lazy: only this path needs cdp_sql / cdp-sdk
+        from . import monitor  # lazy: only this path needs cdp_sql / cdp-sdk
 
         codes = [
             c for c in monitor.discover_builder_codes(self.app_code, days=days)

@@ -78,7 +78,7 @@ Why is that split *enforced*? It's created **ownerless (`owner = 0`) and immutab
 - recipients and the 10/90 ratio are fixed forever at its address. Once USDC lands
 there, nobody (including you) can redirect the builder's cut.
 
-The [`Affiliation`](../python/affiliation.py) facade wraps this: `aff.pay_to` is a
+The [`Affiliation`](../python/x402aff/affiliation.py) facade wraps this: `aff.pay_to` is a
 drop-in x402 `DynamicPayTo` callback, and `aff.pay_to_for(headers)` is the sync
 form for other frameworks. The buyer attaches its code with the official
 `@x402/extensions/builder-code` client extension.
@@ -86,7 +86,7 @@ form for other frameworks. The buyer attaches its code with the official
 ## 3. Components
 
 All kit modules live in [`python/`](../python) (import them by bare name from
-there). The one-object [`affiliation.py`](../python/affiliation.py) facade wraps
+there). The one-object [`affiliation.py`](../python/x402aff/affiliation.py) facade wraps
 the modules below.
 
 | File (`python/…`) | Role in the path |
@@ -112,7 +112,7 @@ the modules below.
 4. **Warm the cache** (optional) for expected builders at startup, so the first
    402 for each needs no live RPC call - the public RPC rate-limits.
 
-The [`Affiliation`](../python/affiliation.py) facade does 1-2 for you: pass
+The [`Affiliation`](../python/x402aff/affiliation.py) facade does 1-2 for you: pass
 `extensions=aff.extensions` and `pay_to=aff.pay_to` to your route.
 
 ## 5. Distribution & monitoring

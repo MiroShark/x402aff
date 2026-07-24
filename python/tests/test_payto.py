@@ -4,10 +4,7 @@ Network-touching bits (resolve, predict_split_address, balanceOf) are monkey-
 patched - these pin the *routing and safety* logic, not on-chain behaviour
 (that's fork-test/CdpPath.t.sol).
 """
-import distribute
-import payto
-import push_split
-import split
+from x402aff import distribute, payto, push_split, split
 
 SELLER = "0x2222222222222222222222222222222222222222"
 BUILDER = "0x1111111111111111111111111111111111111111"

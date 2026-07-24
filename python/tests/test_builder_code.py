@@ -8,7 +8,7 @@ against the calldata suffix (see README → Verify).
 """
 import pytest
 
-from builder_code import (
+from x402aff.builder_code import (
     BUILDER_CODE_KEY,
     ERC_8021_MARKER,
     declare_builder_code,

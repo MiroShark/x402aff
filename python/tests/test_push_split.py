@@ -8,8 +8,7 @@ predicted address cross-checked LIVE against the Base PushSplitFactory
 """
 from __future__ import annotations
 
-import push_split
-import split
+from x402aff import push_split, split
 
 BUILDER = "0x1111111111111111111111111111111111111111"
 SELLER = "0x2222222222222222222222222222222222222222"
