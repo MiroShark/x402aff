@@ -26,6 +26,7 @@ from .affiliation import Affiliation
 from .builder_code import (
     AFFILIATION_MARKER,
     declare_builder_code,
+    marked_service_codes,
     normalize_service_codes,
     parse_builder_code_suffix,
 )
@@ -39,6 +40,7 @@ __all__ = [
     "BUILDER_SHARE_BPS",
     "USDC_BASE",
     "declare_builder_code",
+    "marked_service_codes",
     "normalize_service_codes",
     "parse_builder_code_suffix",
     "predict_split_address",

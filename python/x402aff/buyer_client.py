@@ -23,7 +23,7 @@ across every install - not configurable, so kit payments always stay discoverabl
 """
 from __future__ import annotations
 
-from .builder_code import AFFILIATION_MARKER
+from .builder_code import marked_service_codes
 
 
 class BuilderCodeClientExtension:
@@ -45,9 +45,7 @@ class BuilderCodeClientExtension:
     def enrich_payment_payload(self, payload, payment_required):
         # Always append the shared, hardcoded marker as a second `s` (never a
         # duplicate of the real code), so the payment self-identifies on-chain.
-        codes = [self.code]
-        if AFFILIATION_MARKER and AFFILIATION_MARKER != self.code:
-            codes.append(AFFILIATION_MARKER)
+        codes = marked_service_codes(self.code)
         exts = dict(payload.extensions or {})
         exts["builder-code"] = {"info": {"s": codes}}
         return payload.model_copy(update={"extensions": exts})

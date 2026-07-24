@@ -165,7 +165,10 @@ app.get("/splits", async (_req, res) =>   // TS (Express) — pass your CDP SQL 
 
 The buyer extension stamps a hardcoded, shared marker (`x402aff`) as a second `s`,
 so **one** CDP query finds every kit-routed payment across all sellers - undeployed
-splits included, no address reconstruction:
+splits included, no address reconstruction. Stamping `s` yourself instead of using
+the kit's extension? Build the array with `marked_service_codes("bc_yourcode")`
+(Python) / `markedServiceCodes("bc_yourcode")` (TS) so your payments stay
+discoverable:
 
 ```sql
 SELECT DISTINCT transaction_hash

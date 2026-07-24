@@ -9,9 +9,11 @@ against the calldata suffix (see README → Verify).
 import pytest
 
 from x402aff.builder_code import (
+    AFFILIATION_MARKER,
     BUILDER_CODE_KEY,
     ERC_8021_MARKER,
     declare_builder_code,
+    marked_service_codes,
     normalize_builder_code,
     normalize_service_codes,
     parse_builder_code_suffix,
@@ -64,6 +66,35 @@ def test_normalize_service_codes_dedupes_and_drops_invalid():
 @pytest.mark.parametrize("empty", [None, [], ["BAD!"], "not a code", [""]])
 def test_normalize_service_codes_empty_to_none(empty):
     assert normalize_service_codes(empty) is None
+
+
+# --- marked_service_codes: the buyer-side `s` -------------------------------
+
+def test_marked_service_codes_appends_the_shared_marker():
+    assert marked_service_codes("bc_yourcode") == ["bc_yourcode", AFFILIATION_MARKER]
+
+
+def test_marked_service_codes_keeps_the_real_code_primary():
+    # The split pays the FIRST code, so the marker must never lead.
+    assert marked_service_codes("bc_yourcode")[0] == "bc_yourcode"
+
+
+def test_marked_service_codes_never_duplicates_the_marker():
+    assert marked_service_codes(AFFILIATION_MARKER) == [AFFILIATION_MARKER]
+
+
+def test_buyer_extension_stamps_exactly_marked_service_codes():
+    """The extension must not re-implement the rule - one source of truth."""
+    from x402aff.buyer_client import BuilderCodeClientExtension
+
+    class _Payload:
+        extensions = None
+
+        def model_copy(self, *, update):
+            return update["extensions"]
+
+    stamped = BuilderCodeClientExtension("bc_yourcode").enrich_payment_payload(_Payload(), None)
+    assert stamped["builder-code"]["info"]["s"] == marked_service_codes("bc_yourcode")
 
 
 # --- parse_builder_code_suffix: the "recover w from chain" step ---------------

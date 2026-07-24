@@ -47,7 +47,7 @@ Full integration guide (money path, trust model, wiring, caveats):
 | `payto.py` | Request-time `payTo` resolver. Cached, never raises. |
 | `distribute.py` | The (deploy + distribute) calldata to release a funded split. |
 | `monitor.py` | Which splits hold distributable funds (via CDP's index). |
-| `buyer_client.py` | Buyer-side extension that attaches `s`. |
+| `buyer_client.py` | Buyer-side extension that attaches `s` (via `marked_service_codes`). |
 | `cdp_sql.py` · `queries.sql` | CDP SQL API client + attribution queries. |
 
 ## Develop
