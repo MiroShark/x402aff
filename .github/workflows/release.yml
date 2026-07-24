@@ -7,12 +7,15 @@ name: Release
 #
 # One-time setup, per registry:
 #
-#   PyPI  - trusted publishing, no token. Signed in as the account that should own
-#           the project (a personal one is fine - no PyPI org needed), on
-#           https://pypi.org/manage/account/publishing/ add a *pending* publisher:
-#           project `x402aff`, owner `MiroShark`, repo `x402aff`, workflow
-#           `release.yml`, environment `pypi`. `owner`/`repo` are the GitHub
-#           coordinates and are unrelated to who owns the project on PyPI.
+#   PyPI  - currently the repo secret `PYPI_API_TOKEN` (account-scoped, owner
+#           `aaronjmars`). Trusted publishing is better and needs no secret: on
+#           https://pypi.org/manage/account/publishing/, signed in as the account
+#           that should own the project (a personal one is fine - no PyPI org
+#           needed), add a publisher for project `x402aff`, owner `MiroShark`,
+#           repo `x402aff`, workflow `release.yml`, environment `pypi`. The
+#           `owner`/`repo` there are GitHub coordinates, unrelated to who owns
+#           the project on PyPI. Once it exists, drop the `password:` line below
+#           and delete the secret - `id-token: write` already covers OIDC.
 #   npm   - repo secret `NPM_TOKEN` (an automation token). Provenance is on via
 #           publishConfig, which needs this workflow's `id-token: write`.
 
@@ -49,6 +52,7 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: python/dist
+          password: ${{ secrets.PYPI_API_TOKEN }}
 
   npm:
     if: ${{ github.event_name == 'push' || inputs.target == 'both' || inputs.target == 'npm' }}
