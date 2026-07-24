@@ -132,7 +132,7 @@ ORDER BY total_units DESC;
 -- 5c. Payment COUNT per builder, the cheap way: attributions only, no join onto
 --     base.events. This is what #5b was wanted for, minus the USDC amount.
 --     Because a split is per (seller, builder) pair, a count keyed by builder
---     code IS the per-split count. Swap 'bc_...' for your own `a`.
+--     code IS the per-split count. Swap 'bc_yourcode' for your own `a`.
 --
 --     Confirmed live on Base mainnet 2026-07-24 (200, 4 rows) where #5b 400s.
 --     Rows come back as {builder_code, payments}; your own `a` and the
@@ -143,7 +143,7 @@ SELECT builder_code, count(DISTINCT transaction_hash) AS payments
 FROM base.transaction_attributions
 WHERE transaction_hash IN (
   SELECT transaction_hash FROM base.transaction_attributions
-  WHERE builder_code = 'bc_r3g1wwdh' AND action = 1
+  WHERE builder_code = 'bc_yourcode' AND action = 1
     AND block_timestamp >= now() - INTERVAL 90 DAY
 )
 GROUP BY builder_code;
