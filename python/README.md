@@ -1,5 +1,9 @@
 # x402aff - Python
 
+[![PyPI](https://img.shields.io/pypi/v/x402aff?logo=pypi&logoColor=white&label=pypi)](https://pypi.org/project/x402aff/)
+[![Python versions](https://img.shields.io/pypi/pyversions/x402aff)](https://pypi.org/project/x402aff/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](https://github.com/MiroShark/x402aff/blob/main/LICENSE)
+
 The x402aff kit (Python): an installable `x402aff` package with the one-object
 [`Affiliation`](./x402aff/affiliation.py) facade on top. This is the
 implementation validated end-to-end on Base mainnet.

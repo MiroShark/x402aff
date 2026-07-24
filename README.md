@@ -1,5 +1,10 @@
 # X402aff - Builder-code affiliation for x402 sellers
 
+[![PyPI](https://img.shields.io/pypi/v/x402aff?logo=pypi&logoColor=white&label=pypi)](https://pypi.org/project/x402aff/)
+[![npm](https://img.shields.io/npm/v/x402aff?logo=npm&logoColor=white&label=npm)](https://www.npmjs.com/package/x402aff)
+[![CI](https://github.com/MiroShark/x402aff/actions/workflows/ci.yml/badge.svg)](https://github.com/MiroShark/x402aff/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
+
 **Give the apps that send you paying users a cut - enforced on-chain, at
 settlement, with no facilitator of your own to run.**
 
