@@ -14,7 +14,8 @@ facilitator settles (gas sponsored), an audited 0xSplits contract splits, and th
 builder adds *one line* to their x402 client.
 
 > Validated on **Base mainnet** and reproducible on a mainnet fork - see the
-> Foundry proof in [`fork-test/`](./fork-test).
+> Foundry proof in [`fork-test/`](./fork-test), and a live seller's claims
+> dashboard at [miroshark.xyz/x402aff](https://miroshark.xyz/x402aff).
 
 ---
 
@@ -117,6 +118,12 @@ a `GET /splits` route: split address, codes + share, live balance, deployed stat
 and a permissionless `[deploy?, distribute]` claim. It reconstructs from the seller
 wallet the facade already holds, so it covers **undeployed** splits too - a
 counterfactual address can't be recovered seller-side from the chain otherwise.
+
+**See one running:** [miroshark.xyz/x402aff](https://miroshark.xyz/x402aff) serves
+this payload live from a Base-mainnet seller. Every split, balance, and claim on
+that page comes from `aff.splits_payload()`, and the claim button is the
+permissionless `distribute` - anyone can trigger it, and the funds still go only to
+the split's baked-in recipients.
 
 ```python
 @app.get("/splits")                       # Python (Flask)
