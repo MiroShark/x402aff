@@ -495,8 +495,8 @@ export class Affiliation {
    * this facade holds, so even undeployed splits build with no guessing. The
    * marker + unregistered codes are skipped.
    *
-   * No per-split payment count: see queries.sql #5b for why that rollup is not
-   * served from the CDP SQL API.
+   * No per-split payment count: the query that would produce one 400s on the
+   * CDP SQL API (queries.sql #5b). #5c has a cheap count-only alternative.
    */
   async splitsPayload(query: CdpQuery, opts?: { days?: number }): Promise<SplitsPayload> {
     const days = opts?.days ?? 90;

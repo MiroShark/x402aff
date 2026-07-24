@@ -145,9 +145,12 @@ seller-side from the chain otherwise). Discovery is by your app code `a` via CDP
 viem-only). Mount it in one line and render the rows however you like - the claim
 calls are permissionless, so anyone can trigger them.
 
-There is deliberately **no per-split payment count**: the only query that could
-produce one joins `base.events` and trips the CDP SQL API's leaf-scan limit, so
-it 400s. See `python/queries.sql` #5b before trying to add it back.
+There is deliberately **no per-split payment count**: producing one alongside the
+received USDC amount means joining `base.events`, which trips the CDP SQL API's
+leaf-scan limit (measured 94.44 GiB against a 93.13 GiB cap) and 400s. If you
+want just the count, `python/queries.sql` #5c gets it from the attribution table
+alone - no join, and confirmed working. #5b documents why the amount can't come
+cheaply.
 
 ```python
 @app.get("/splits")                       # Python (Flask)

@@ -229,8 +229,8 @@ class Affiliation:
         no guessing. The shared marker and any unregistered/​unresolvable builder
         code are skipped.
 
-        No per-split payment count: see queries.sql #5b for why that rollup is
-        not served from the CDP SQL API.
+        No per-split payment count: the query that would produce one 400s on
+        the CDP SQL API (queries.sql #5b). #5c has a cheap count-only alternative.
 
         Needs ``cdp-sdk`` (discovery) + a Base RPC (balances). Returns a dict:
         ``{"configured": True, "marker": ..., "count": N, "splits": [...]}``.
