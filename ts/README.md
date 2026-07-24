@@ -1,5 +1,9 @@
 # x402aff (TypeScript)
 
+[![npm](https://img.shields.io/npm/v/x402aff?logo=npm&logoColor=white&label=npm)](https://www.npmjs.com/package/x402aff)
+[![install size](https://img.shields.io/bundlephobia/minzip/x402aff?label=minzipped)](https://bundlephobia.com/package/x402aff)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](https://github.com/MiroShark/x402aff/blob/main/LICENSE)
+
 The `Affiliation` facade for x402 sellers on the **Node / TypeScript** stack - a
 port of the repo's Python [`affiliation.py`](../python/x402aff/affiliation.py). Same three
 on-chain reads, same safe-fallback contract, and it resolves the **identical
