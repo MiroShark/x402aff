@@ -161,6 +161,34 @@ def test_release_skips_deploy_when_already_deployed(monkeypatch):
     assert [c.step for c in calls] == ["distribute"]
 
 
+def test_splits_payload_shapes_rows_filters_marker_and_joins_rollup(monkeypatch):
+    import monitor
+
+    _patch_registered(monkeypatch, deployed=False, balance=1_000_000)
+    # Discovery + rollup are CDP-backed; stub them. The shared marker rides along
+    # as a "builder" and must be dropped; the app code + facilitator are already
+    # filtered by discover_builder_codes.
+    monkeypatch.setattr(monitor, "discover_builder_codes",
+                        lambda app_code, **kw: ["bc_alice", "x402aff"])
+    monkeypatch.setattr(monitor, "discover_split_rollup",
+                        lambda app_code, **kw: {SPLIT.lower(): (3, 3_000_000)})
+
+    payload = _aff().splits_payload()
+    assert payload["configured"] is True
+    assert payload["marker"] == "x402aff"
+    assert payload["count"] == 1  # the marker row is dropped
+    s = payload["splits"][0]
+    assert s["payTo"] == SPLIT
+    assert s["sellerCode"] == "bc_seller"
+    assert s["builderCode"] == "bc_alice"
+    assert s["payments"] == 3               # joined from the rollup
+    assert s["receivedUnits"] == "3000000"
+    assert s["balanceUnits"] == "1000000"
+    assert s["deployed"] is False
+    assert s["claimable"] is True
+    assert [c["step"] for c in s["calls"]] == ["deploy_split", "distribute"]
+
+
 def test_resolve_failure_falls_back_and_logs(monkeypatch, caplog):
     def _boom(code, **kw):
         raise RuntimeError("RPC 429")

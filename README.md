@@ -133,6 +133,27 @@ directly (Python) and address-prediction + distribute just work - see the
 CLI) discovers every builder who paid you - straight from CDP's index, no local
 ledger - and shows which splits are ready to release, with the `cast` commands.
 
+### Claims dashboard (`aff.splits_payload()`)
+
+One call returns every per-builder split for your seller, ready to serialize
+behind a `GET /splits` route: each row has the split address, codes + share, live
+balance, deployed state, payment count / received total, and a permissionless
+`[deploy?, distribute]` claim. Because it reconstructs from the seller wallet the
+facade already holds, it covers **undeployed** splits too (a counterfactual
+address can't be resolved seller-side from the chain otherwise). Discovery is by
+your app code `a` via CDP (Python bundles it; TS takes an injected `query` runner
+so the kit stays viem-only). Mount it in one line and render the rows however you
+like - the claim calls are permissionless, so anyone can trigger them.
+
+```python
+@app.get("/splits")                       # Python (Flask)
+def splits(): return aff.splits_payload()
+```
+```ts
+app.get("/splits", async (_req, res) =>   // TS (Express) — pass your CDP SQL runner
+  res.json(await aff.splitsPayload(cdpQuery)));
+```
+
 ### Discover every kit payment (any seller)
 
 The buyer extension stamps a hardcoded, shared marker (`x402aff`) as a second `s`,
