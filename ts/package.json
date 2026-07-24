@@ -1,6 +1,6 @@
 {
   "name": "x402aff",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Builder-code affiliation for x402 sellers - the Affiliation facade (TypeScript port of affiliation.py).",
   "type": "module",
   "exports": {
@@ -26,7 +26,13 @@
     "test": "node --test 'test/**/*.test.ts'",
     "prepublishOnly": "npm run typecheck && npm test && npm run build"
   },
-  "keywords": ["x402", "builder-codes", "0xsplits", "base", "affiliation"],
+  "keywords": [
+    "x402",
+    "builder-codes",
+    "0xsplits",
+    "base",
+    "affiliation"
+  ],
   "license": "MIT",
   "homepage": "https://github.com/MiroShark/x402aff#readme",
   "repository": {

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "x402aff"
-version = "0.1.0"
+version = "0.1.1"
 description = "Builder-code affiliation for x402 sellers - route each payment to a per-(seller, builder) 0xSplits split."
 readme = "README.md"
 requires-python = ">=3.9"
