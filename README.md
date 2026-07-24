@@ -68,6 +68,9 @@ code at [base.dev](https://base.dev) → *Settings → Builder Codes*, then:
 
 ### TypeScript / Node → [`ts/`](./ts) · guide: [`ts/README.md`](./ts/README.md)
 
+```bash
+npm install ./x402aff/ts     # from a clone; not published to npm
+```
 ```ts
 import { Affiliation } from "x402aff";
 
@@ -78,10 +81,14 @@ const extensions = aff.extensions;               // declares your `a`
 // payouts: const { calls, balanceUnits } = await aff.release("bc_alice");
 ```
 
-Only dependency: `viem`.
+Only dependency: `viem`. Or just vendor `ts/src/affiliation.ts` - it is one file.
 
 ### Python → [`python/`](./python) · guide: [`INTEGRATION.md`](./docs/INTEGRATION.md)
 
+```bash
+pip install ./x402aff/python     # from a clone; not published to PyPI
+                                 # add [cdp] for the CDP discovery path
+```
 ```python
 from x402aff import Affiliation
 
@@ -99,8 +106,11 @@ calls, balance = aff.release("bc_alice")
 is the sync form for other frameworks. Full wiring notes: [`docs/INTEGRATION.md`](./docs/INTEGRATION.md).
 
 Both **never throw**: an unknown or unresolvable code falls back to your wallet -
-the payment always works, it just isn't split. And the **buyer side is one line** in
-the official TS extension (`BuilderCodeClientExtension`) - no work on your users.
+the payment always works, it just isn't split. And the **buyer side is one line**:
+Python ships `BuilderCodeClientExtension` (`x402aff.buyer_client`), TS uses the
+official `@x402/extensions/builder-code` - no work on your users. Stamping `s`
+by hand instead? `marked_service_codes()` / `markedServiceCodes()` build the
+array for you.
 
 ---
 
@@ -280,7 +290,7 @@ private key.
 | [`ts/`](./ts) · [`python/`](./python) | **Start here** - the `Affiliation` facades (TypeScript + Python). |
 | [`docs/INTEGRATION.md`](./docs/INTEGRATION.md) | Python integration deep-dive (money path, trust model, wiring, caveats). |
 | [`fork-test/`](./fork-test) | Foundry proof: CDP-settle → split → distribute against live Base contracts on a mainnet fork. |
-| `python/{resolver,split,push_split,payto,distribute,monitor}.py` | The primitives the facades wrap (code→payout, split plan, 0xSplits calldata, request-time payTo, release, monitoring). |
+| `python/x402aff/{resolver,split,push_split,payto,distribute,monitor}.py` | The primitives the facades wrap (code→payout, split plan, 0xSplits calldata, request-time payTo, release, monitoring). |
 
 ```bash
 cd python && pytest            # Python unit tests
