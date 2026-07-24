@@ -85,6 +85,9 @@ WHERE builder_code = 'x402aff'
 --     blocks that carry a marked tx (base.events by USDC alone is ~93 GiB/week).
 --     Group by pay_to for a per-split rollup; the contracts among these are your
 --     kit splits, a direct-to-seller payTo is an EOA (see docs/INTEGRATION.md).
+--     The kit runs this SCOPED to one seller (WHERE builder_code = your `a`, not
+--     the marker) in monitor.discover_split_rollup — the payments/received counts
+--     behind aff.splits_payload() / the /splits dashboard route.
 -- ─────────────────────────────────────────────────────────────────────────────
 SELECT
   toString(e.parameters['to'])                          AS pay_to,

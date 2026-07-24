@@ -273,3 +273,34 @@ test("a custom builder share changes the split address it resolves", async () =>
   assert.equal(p25.recipients[0][1], 2500);
   assert.notEqual(isDeployedCalldata(p10), isDeployedCalldata(p25));
 });
+
+test("splitsPayload shapes rows, filters the marker, and joins the rollup", async () => {
+  const a = aff(mockClient({ payout: BUILDER, deployed: false, balance: 1_000_000n }));
+  // Injected CDP query: branch on the SQL. The marker rides along as a "builder"
+  // and must be dropped; the app code + facilitator are dropped by discover.
+  const query = async (sql: string) => {
+    if (sql.includes("base.events")) {
+      return [{ pay_to: SPLIT.toLowerCase(), payments: 3, received: "3000000" }];
+    }
+    return [
+      { builder_code: "bc_alice" },
+      { builder_code: "x402aff" },
+      { builder_code: "bc_seller" },
+      { builder_code: "cdp_facil1" },
+    ];
+  };
+  const payload = await a.splitsPayload(query);
+  assert.equal(payload.configured, true);
+  assert.equal(payload.marker, "x402aff");
+  assert.equal(payload.count, 1); // marker + appCode + facilitator filtered out
+  const s = payload.splits[0];
+  assert.equal(s.payTo.toLowerCase(), SPLIT.toLowerCase());
+  assert.equal(s.sellerCode, "bc_seller");
+  assert.equal(s.builderCode, "bc_alice");
+  assert.equal(s.payments, 3);
+  assert.equal(s.receivedUnits, "3000000");
+  assert.equal(s.balanceUnits, "1000000");
+  assert.equal(s.deployed, false);
+  assert.equal(s.claimable, true);
+  assert.deepEqual(s.calls.map((c) => c.step), ["deploy_split", "distribute"]);
+});

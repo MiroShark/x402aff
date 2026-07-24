@@ -42,7 +42,7 @@ import payto
 import push_split
 import resolver
 import split
-from builder_code import declare_builder_code
+from builder_code import AFFILIATION_MARKER, declare_builder_code
 
 log = logging.getLogger("affiliation")
 
@@ -217,6 +217,58 @@ class Affiliation:
         addr, deployed = push_split.predict_split_address(plan, rpc_url=self.rpc_url)
         bal = distribute.split_balance_units(addr, rpc_url=self.rpc_url)
         return monitor.SplitStatus(code, payout, addr, deployed, bal)
+
+    def splits_payload(self, *, days: int = 90) -> dict:
+        """The claims-dashboard payload — every per-builder split for this seller,
+        ready to serialize to JSON. One reusable call behind a ``/splits`` route.
+
+        Each row carries the split address, its codes + share, live balance,
+        deployed state, payment count / received total, and a permissionless
+        ``[deploy?, distribute]`` claim. Discovery is by our app code ``a`` (CDP);
+        the claim is reconstructed from the seller wallet THIS facade holds, so
+        even undeployed splits build with no guessing. The shared marker and any
+        unregistered/​unresolvable builder code are skipped.
+
+        Needs ``cdp-sdk`` (discovery) + a Base RPC (balances). Returns a dict:
+        ``{"configured": True, "marker": ..., "count": N, "splits": [...]}``.
+        """
+        import monitor  # lazy: only this path needs cdp_sql / cdp-sdk
+
+        codes = [
+            c for c in monitor.discover_builder_codes(self.app_code, days=days)
+            if c != AFFILIATION_MARKER
+        ]
+        rollup = monitor.discover_split_rollup(self.app_code, days=days)
+
+        splits = []
+        for code in codes:
+            pt = self.resolve(code=code)
+            if not pt.attributed:  # unregistered builder / no split for this pair
+                continue
+            # resolve() is memoized, so release() reuses it (one set of reads/code).
+            calls, balance = self.release(code)
+            payments, received = rollup.get(pt.address.lower(), (0, 0))
+            splits.append({
+                "payTo": pt.address,
+                "sellerCode": self.app_code,
+                "builderCode": code,
+                "builderShareBps": self._share,
+                "payments": payments,
+                "receivedUnits": str(received),
+                "balanceUnits": str(balance),
+                # deployed = no deploy leg needed (the split contract already exists).
+                "deployed": not any(c.step == "deploy_split" for c in calls),
+                "claimable": len(calls) > 0,
+                "calls": [{"step": c.step, "target": c.target, "data": c.data} for c in calls],
+            })
+
+        splits.sort(key=lambda s: int(s["balanceUnits"]), reverse=True)
+        return {
+            "configured": True,
+            "marker": AFFILIATION_MARKER,
+            "count": len(splits),
+            "splits": splits,
+        }
 
 
 if __name__ == "__main__":
