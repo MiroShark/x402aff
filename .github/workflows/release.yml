@@ -7,9 +7,12 @@ name: Release
 #
 # One-time setup, per registry:
 #
-#   PyPI  - trusted publishing, no token. On https://pypi.org/manage/account/publishing/
-#           add a *pending* publisher: project `x402aff`, owner `MiroShark`,
-#           repo `x402aff`, workflow `release.yml`, environment `pypi`.
+#   PyPI  - trusted publishing, no token. Signed in as the account that should own
+#           the project (a personal one is fine - no PyPI org needed), on
+#           https://pypi.org/manage/account/publishing/ add a *pending* publisher:
+#           project `x402aff`, owner `MiroShark`, repo `x402aff`, workflow
+#           `release.yml`, environment `pypi`. `owner`/`repo` are the GitHub
+#           coordinates and are unrelated to who owns the project on PyPI.
 #   npm   - repo secret `NPM_TOKEN` (an automation token). Provenance is on via
 #           publishConfig, which needs this workflow's `id-token: write`.
 
