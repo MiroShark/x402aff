@@ -6,7 +6,12 @@ implementation validated end-to-end on Base mainnet.
 
 ## Install
 
-Not on PyPI - install from a checkout or straight from git:
+```bash
+pip install x402aff                  # from PyPI
+pip install 'x402aff[cdp]'           # with the CDP discovery extra
+```
+
+Or from a checkout / straight from git, to track unreleased changes:
 
 ```bash
 pip install ./python                 # from a clone, at the repo root

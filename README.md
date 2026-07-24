@@ -52,7 +52,7 @@ at [base.dev](https://base.dev) → *Settings → Builder Codes*, then:
 ### TypeScript / Node → [`ts/`](./ts) · guide: [`ts/README.md`](./ts/README.md)
 
 ```bash
-npm install ./x402aff/ts     # from a clone; not published to npm
+npm install x402aff viem     # viem is a peer dependency
 ```
 ```ts
 import { Affiliation } from "x402aff";
@@ -64,13 +64,14 @@ const extensions = aff.extensions;               // declares your `a`
 // payouts: const { calls, balanceUnits } = await aff.release("bc_alice");
 ```
 
-Only dependency: `viem`. Or just vendor `ts/src/affiliation.ts` - it is one file.
+Only dependency: `viem`, kept as a peer so you share the one your app already
+has. Or just vendor `ts/src/affiliation.ts` - it is one file, and it ships in the
+published tarball too.
 
 ### Python → [`python/`](./python) · guide: [`INTEGRATION.md`](./docs/INTEGRATION.md)
 
 ```bash
-pip install ./x402aff/python     # from a clone; not published to PyPI
-                                 # add [cdp] for the CDP discovery path
+pip install x402aff              # add 'x402aff[cdp]' for the CDP discovery path
 ```
 ```python
 from x402aff import Affiliation

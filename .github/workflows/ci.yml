@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# fork-test/ is deliberately not run here: it forks Base mainnet and needs an RPC
+# secret. Run `forge test` locally with X402_BASE_RPC set.
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -e '.[dev]'
+        working-directory: python
+      - run: pytest
+        working-directory: python
+
+  typescript:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # `node --test` runs the .ts tests directly, which needs the unflagged
+        # type stripping in Node >= 22.18.
+        node-version: ["22", "24"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: ts/package-lock.json
+      - run: npm ci
+        working-directory: ts
+      - run: npm run typecheck
+        working-directory: ts
+      - run: npm test
+        working-directory: ts
+      - run: npm run build
+        working-directory: ts
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      # Catch metadata rot before a tag does: both artifacts must build and pass
+      # their registry's own validation.
+      - run: pip install build twine
+      - run: python -m build
+        working-directory: python
+      - run: twine check python/dist/*
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: ts/package-lock.json
+      - run: npm ci
+        working-directory: ts
+      - run: npm run build
+        working-directory: ts
+      - run: npm pack --dry-run
+        working-directory: ts

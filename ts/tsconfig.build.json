@@ -1,0 +1,18 @@
+// Publish build: emits dist/affiliation.js + .d.ts from src/.
+//
+// The base config is tuned for editing and `node --test` on raw .ts (noEmit +
+// allowImportingTsExtensions), neither of which can produce a package. This one
+// flips both and drops test/ from the program.
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "allowImportingTsExtensions": false,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src"]
+}
