@@ -1,0 +1,73 @@
+name: Release
+
+# Publishes both packages - PyPI `x402aff` (python/) and npm `x402aff` (ts/) -
+# from one tag. Bump both versions to match the tag, then:
+#
+#     git tag v0.1.0 && git push origin v0.1.0
+#
+# One-time setup, per registry:
+#
+#   PyPI  - trusted publishing, no token. Signed in as the account that should own
+#           the project (a personal one is fine - no PyPI org needed), on
+#           https://pypi.org/manage/account/publishing/ add a *pending* publisher:
+#           project `x402aff`, owner `MiroShark`, repo `x402aff`, workflow
+#           `release.yml`, environment `pypi`. `owner`/`repo` are the GitHub
+#           coordinates and are unrelated to who owns the project on PyPI.
+#   npm   - repo secret `NPM_TOKEN` (an automation token). Provenance is on via
+#           publishConfig, which needs this workflow's `id-token: write`.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Which registry to publish to
+        type: choice
+        options: [both, pypi, npm]
+        default: both
+
+jobs:
+  pypi:
+    if: ${{ github.event_name == 'push' || inputs.target == 'both' || inputs.target == 'pypi' }}
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write # trusted publishing
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - run: pip install -e '.[dev]' build twine
+        working-directory: python
+      - run: pytest
+        working-directory: python
+      - run: python -m build
+        working-directory: python
+      - run: twine check python/dist/*
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: python/dist
+
+  npm:
+    if: ${{ github.event_name == 'push' || inputs.target == 'both' || inputs.target == 'npm' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # provenance attestation
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          registry-url: https://registry.npmjs.org
+          cache: npm
+          cache-dependency-path: ts/package-lock.json
+      - run: npm ci
+        working-directory: ts
+      # prepublishOnly runs typecheck + tests + build before the tarball is cut.
+      - run: npm publish
+        working-directory: ts
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -10,6 +10,16 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 keywords = ["x402", "builder-codes", "0xsplits", "base", "affiliation"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Office/Business :: Financial",
+    "Topic :: Software Development :: Libraries",
+    "Typing :: Typed",
+]
 dependencies = [
     "requests>=2.28",
     "cbor2>=5.4",
@@ -22,13 +32,17 @@ dev = ["pytest>=7.0"]
 
 [project.urls]
 Homepage = "https://github.com/MiroShark/x402aff"
+Repository = "https://github.com/MiroShark/x402aff"
+Documentation = "https://github.com/MiroShark/x402aff/blob/main/docs/INTEGRATION.md"
+Issues = "https://github.com/MiroShark/x402aff/issues"
 
 [tool.setuptools]
 packages = ["x402aff"]
 
 [tool.setuptools.package-data]
-# Ship the reference queries alongside the code they document.
-x402aff = ["queries.sql"]
+# Ship the reference queries alongside the code they document, and the PEP 561
+# marker so a consumer's type checker sees the annotations.
+x402aff = ["queries.sql", "py.typed"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

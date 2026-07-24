@@ -11,14 +11,24 @@ Only dependency: [`viem`](https://viem.sh).
 ## Install
 
 ```bash
-npm install viem   # then drop src/affiliation.ts into your project, or:
-npm install        # from this dir, to run the tests
+npm install x402aff viem   # viem is a peer dependency - you bring your own
+```
+
+Or vendor it: the package ships `src/affiliation.ts` alongside `dist/`, so you
+can copy that one file into your project and depend on nothing but `viem`.
+
+Working on the kit itself:
+
+```bash
+npm install        # from this dir
+npm test           # needs Node >= 22.18 (runs the .ts tests via type stripping)
+npm run build      # emits dist/ via tsconfig.build.json
 ```
 
 ## Use
 
 ```ts
-import { Affiliation } from "./src/affiliation.ts";
+import { Affiliation } from "x402aff";
 
 const aff = new Affiliation({
   appCode: "bc_yourcode",
