@@ -77,49 +77,6 @@ def discover_builder_codes(app_code: str, *, days: int = 90) -> list[str]:
     return [c for c in codes if c != app_code and not c.startswith(_FACIL_PREFIX)]
 
 
-def discover_split_rollup(app_code: str, *, days: int = 90) -> dict[str, tuple[int, int]]:
-    """Per-destination rollup for our `a`: ``{pay_to (lowercase): (payments, received_units)}``.
-
-    ONE CDP query joins the USDC Transfer log onto every settlement that carried
-    our app code, grouping by the transfer's destination. For an attributed
-    payment that destination is the per-pair split; for an unattributed one it's
-    our own wallet (harmless — it just won't match any reconstructed split). Cheap
-    because the ``block_number IN (...)`` bound restricts the (huge) base.events
-    scan to only the blocks holding one of our txs. This is queries.sql #5b scoped
-    to ``a`` instead of the shared marker, so it counts only THIS seller's splits.
-    """
-    a = app_code.replace("'", "")
-    d = int(days)
-    usdc = push_split.USDC_BASE.lower()
-    sql = f"""
-    SELECT
-      toString(e.parameters['to'])                          AS pay_to,
-      count()                                                AS payments,
-      sum(toUInt256OrZero(toString(e.parameters['value']))) AS received
-    FROM base.events e
-    WHERE e.event_name = 'Transfer'
-      AND lower(e.address) = '{usdc}'
-      AND e.action = 1
-      AND e.transaction_hash IN (
-        SELECT transaction_hash FROM base.transaction_attributions
-        WHERE builder_code = '{a}' AND action = 1
-          AND block_timestamp >= now() - INTERVAL {d} DAY
-      )
-      AND e.block_number IN (
-        SELECT block_number FROM base.transaction_attributions
-        WHERE builder_code = '{a}' AND action = 1
-          AND block_timestamp >= now() - INTERVAL {d} DAY
-      )
-    GROUP BY pay_to
-    """
-    out: dict[str, tuple[int, int]] = {}
-    for r in cdp_sql.run_query(sql, max_age_ms=5000):
-        addr = str(r.get("pay_to") or "").lower()
-        if addr.startswith("0x"):
-            out[addr] = (int(r.get("payments") or 0), int(r.get("received") or 0))
-    return out
-
-
 def status_for(code: str, *, seller_payout: str, rpc_url: Optional[str] = None) -> SplitStatus:
     """Resolve a code, predict its split, and read the split's USDC balance."""
     info = resolver.resolve(code, rpc_url=rpc_url or push_split.BASE_RPC)

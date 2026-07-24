@@ -328,8 +328,6 @@ export interface SplitRow {
   sellerCode: string;
   builderCode: string;
   builderShareBps: number;
-  payments: number;
-  receivedUnits: string;
   balanceUnits: string;
   deployed: boolean;
   claimable: boolean;
@@ -363,44 +361,6 @@ export async function discoverBuilderCodes(query: CdpQuery, appCode: string, day
     .filter((c) => c && c !== appCode && !c.startsWith("cdp_facil"));
 }
 
-/** Per-destination rollup for our `a`: `pay_to (lowercase) → {payments, received}`.
- *  One query joins the USDC Transfer log onto our settlements; the destination is
- *  the per-pair split (or our own wallet for unattributed payments, which just
- *  won't match a reconstructed split). queries.sql #5b scoped to `a`. Mirror of
- *  the Python kit's monitor.discover_split_rollup. */
-export async function discoverSplitRollup(
-  query: CdpQuery,
-  appCode: string,
-  days = 90,
-): Promise<Map<string, { payments: number; received: bigint }>> {
-  const a = appCode.replace(/'/g, "");
-  const d = Math.trunc(days);
-  const usdc = USDC_BASE.toLowerCase();
-  const rows = await query(
-    `SELECT toString(e.parameters['to']) AS pay_to, count() AS payments, ` +
-      `sum(toUInt256OrZero(toString(e.parameters['value']))) AS received ` +
-      `FROM base.events e WHERE e.event_name = 'Transfer' ` +
-      `AND lower(e.address) = '${usdc}' AND e.action = 1 ` +
-      `AND e.transaction_hash IN (SELECT transaction_hash FROM base.transaction_attributions ` +
-      `WHERE builder_code = '${a}' AND action = 1 AND block_timestamp >= now() - INTERVAL ${d} DAY) ` +
-      `AND e.block_number IN (SELECT block_number FROM base.transaction_attributions ` +
-      `WHERE builder_code = '${a}' AND action = 1 AND block_timestamp >= now() - INTERVAL ${d} DAY) ` +
-      `GROUP BY pay_to`,
-  );
-  const out = new Map<string, { payments: number; received: bigint }>();
-  for (const r of rows) {
-    const addr = String(r.pay_to ?? "").toLowerCase();
-    if (!addr.startsWith("0x")) continue;
-    let received = 0n;
-    try {
-      received = BigInt(String(r.received ?? "0"));
-    } catch {
-      received = 0n;
-    }
-    out.set(addr, { payments: Number(r.payments ?? 0), received });
-  }
-  return out;
-}
 
 // ── the facade ─────────────────────────────────────────────────────────────
 
@@ -529,32 +489,31 @@ export class Affiliation {
   /**
    * The claims-dashboard payload — every per-builder split for this seller, ready
    * to serialize to JSON. One reusable call behind a `/splits` route. Each row
-   * carries the split address, codes + share, live balance, deployed state,
-   * payment count / received total, and a permissionless [deploy?, distribute]
-   * claim. Discovery is by our app code `a` (via the injected `query`); the claim
-   * is reconstructed from the seller wallet this facade holds, so even undeployed
-   * splits build with no guessing. The marker + unregistered codes are skipped.
+   * carries the split address, codes + share, live balance, deployed state, and a
+   * permissionless [deploy?, distribute] claim. Discovery is by our app code `a`
+   * (via the injected `query`); the claim is reconstructed from the seller wallet
+   * this facade holds, so even undeployed splits build with no guessing. The
+   * marker + unregistered codes are skipped.
+   *
+   * No per-split payment count: the query that would produce one 400s on the
+   * CDP SQL API (queries.sql #5b). #5c has a cheap count-only alternative.
    */
   async splitsPayload(query: CdpQuery, opts?: { days?: number }): Promise<SplitsPayload> {
     const days = opts?.days ?? 90;
     const codes = (await discoverBuilderCodes(query, this.appCode, days)).filter(
       (c) => c !== AFFILIATION_MARKER,
     );
-    const rollup = await discoverSplitRollup(query, this.appCode, days);
 
     const splits: SplitRow[] = [];
     for (const code of codes) {
       const pt = await this.resolve(code);
       if (!pt.attributed) continue; // unregistered builder / no split for this pair
       const { calls, balanceUnits } = await this.release(code);
-      const r = rollup.get(pt.address.toLowerCase()) ?? { payments: 0, received: 0n };
       splits.push({
         payTo: pt.address,
         sellerCode: this.appCode,
         builderCode: code,
         builderShareBps: this.builderShareBps,
-        payments: r.payments,
-        receivedUnits: r.received.toString(),
         balanceUnits: balanceUnits.toString(),
         deployed: !calls.some((c) => c.step === "deploy_split"),
         claimable: calls.length > 0,

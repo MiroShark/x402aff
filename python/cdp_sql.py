@@ -78,7 +78,10 @@ def run_query(sql: str, *, max_age_ms: int = 5000, timeout: float = 35.0) -> lis
         json={"sql": sql, "cache": {"maxAgeMs": max_age_ms}},
         timeout=timeout,
     )
-    resp.raise_for_status()
+    # Surface the API's error BODY, not just the status - a 400 here is almost
+    # always a SQL error the body explains (raise_for_status drops it).
+    if not resp.ok:
+        raise RuntimeError(f"CDP SQL {resp.status_code}: {(resp.text or '')[:600]}")
     return resp.json().get("result", [])
 
 

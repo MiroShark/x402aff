@@ -137,13 +137,20 @@ ledger - and shows which splits are ready to release, with the `cast` commands.
 
 One call returns every per-builder split for your seller, ready to serialize
 behind a `GET /splits` route: each row has the split address, codes + share, live
-balance, deployed state, payment count / received total, and a permissionless
-`[deploy?, distribute]` claim. Because it reconstructs from the seller wallet the
-facade already holds, it covers **undeployed** splits too (a counterfactual
-address can't be resolved seller-side from the chain otherwise). Discovery is by
-your app code `a` via CDP (Python bundles it; TS takes an injected `query` runner
-so the kit stays viem-only). Mount it in one line and render the rows however you
-like - the claim calls are permissionless, so anyone can trigger them.
+balance, deployed state, and a permissionless `[deploy?, distribute]` claim.
+Because it reconstructs from the seller wallet the facade already holds, it
+covers **undeployed** splits too (a counterfactual address can't be resolved
+seller-side from the chain otherwise). Discovery is by your app code `a` via CDP
+(Python bundles it; TS takes an injected `query` runner so the kit stays
+viem-only). Mount it in one line and render the rows however you like - the claim
+calls are permissionless, so anyone can trigger them.
+
+There is deliberately **no per-split payment count**: producing one alongside the
+received USDC amount means joining `base.events`, which trips the CDP SQL API's
+leaf-scan limit (measured 94.44 GiB against a 93.13 GiB cap) and 400s. If you
+want just the count, `python/queries.sql` #5c gets it from the attribution table
+alone - no join, and confirmed working. #5b documents why the amount can't come
+cheaply.
 
 ```python
 @app.get("/splits")                       # Python (Flask)

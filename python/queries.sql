@@ -80,14 +80,33 @@ WHERE builder_code = 'x402aff'
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 5b. …with each payment's payTo (the split) + USDC amount, by joining the
---     Transfer log on the same tx. Cheap because the marker set is tiny: the
---     `block_number IN (...)` bound restricts the base.events scan to only the
---     blocks that carry a marked tx (base.events by USDC alone is ~93 GiB/week).
---     Group by pay_to for a per-split rollup; the contracts among these are your
---     kit splits, a direct-to-seller payTo is an EOA (see docs/INTEGRATION.md).
---     The kit runs this SCOPED to one seller (WHERE builder_code = your `a`, not
---     the marker) in monitor.discover_split_rollup — the payments/received counts
---     behind aff.splits_payload() / the /splits dashboard route.
+--     Transfer log on the same tx. Group by pay_to for a per-split rollup; the
+--     contracts among these are your kit splits, a direct-to-seller payTo is an
+--     EOA (see docs/INTEGRATION.md).
+--
+--     ⚠ DOES NOT RUN ON THE CDP SQL API - kept for reference only. The intent
+--     was that `block_number IN (...)` would restrict the base.events scan to
+--     only the blocks carrying a marked tx, but the planner does not push that
+--     bound down: the query still scans base.events by USDC and trips the API's
+--     leaf-scan limit. Measured live on Base mainnet, 2026-07-24:
+--
+--       400 invalid_request
+--       "Limit for rows or bytes to read on leaf node exceeded,
+--        max bytes: 93.13 GiB, current bytes: 94.44 GiB"
+--
+--     Both scopes fail, and narrowing does not help - the floor is the USDC
+--     Transfer scan itself, which alone is already over the limit:
+--       - as written above (marker scope, no time bound) ...... 94.44 GiB
+--       - scoped to one seller's `a` + a 90-day bound ......... 93.99 GiB
+--     Query #5 above (same attribution set, no base.events join) returns 200.
+--
+--     This is why `aff.splits_payload()` carries NO per-split payment count: the
+--     kit ran this scoped to one seller in monitor.discover_split_rollup, and it
+--     400'd on every call. Do not reintroduce it without re-measuring live.
+--
+--     For a payment COUNT, use #5c below instead - no events join, and confirmed
+--     working. The received USDC AMOUNT has no cheap source: it only exists in
+--     the Transfer log, which is the thing that blows the limit.
 -- ─────────────────────────────────────────────────────────────────────────────
 SELECT
   toString(e.parameters['to'])                          AS pay_to,
@@ -107,3 +126,24 @@ WHERE e.event_name = 'Transfer'
   )
 GROUP BY pay_to
 ORDER BY total_units DESC;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 5c. Payment COUNT per builder, the cheap way: attributions only, no join onto
+--     base.events. This is what #5b was wanted for, minus the USDC amount.
+--     Because a split is per (seller, builder) pair, a count keyed by builder
+--     code IS the per-split count. Swap 'bc_...' for your own `a`.
+--
+--     Confirmed live on Base mainnet 2026-07-24 (200, 4 rows) where #5b 400s.
+--     Rows come back as {builder_code, payments}; your own `a` and the
+--     facilitator (cdp_facil*) appear too - filter them the way
+--     monitor.discover_builder_codes does.
+-- ─────────────────────────────────────────────────────────────────────────────
+SELECT builder_code, count(DISTINCT transaction_hash) AS payments
+FROM base.transaction_attributions
+WHERE transaction_hash IN (
+  SELECT transaction_hash FROM base.transaction_attributions
+  WHERE builder_code = 'bc_r3g1wwdh' AND action = 1
+    AND block_timestamp >= now() - INTERVAL 90 DAY
+)
+GROUP BY builder_code;
