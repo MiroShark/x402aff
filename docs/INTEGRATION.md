@@ -59,7 +59,7 @@ its builder at **request time** with an `X-Builder-Code` header, and your server
 sets `payTo` to that pair's split:
 
 ```python
-import payto
+from x402aff import payto
 
 code = payto.builder_code_from_headers(request.headers)          # X-Builder-Code
 pt = payto.payto_for_request(code, seller_payout=YOUR_WALLET)     # never raises
@@ -80,16 +80,18 @@ there, nobody (including you) can redirect the builder's cut.
 
 The [`Affiliation`](../python/x402aff/affiliation.py) facade wraps this: `aff.pay_to` is a
 drop-in x402 `DynamicPayTo` callback, and `aff.pay_to_for(headers)` is the sync
-form for other frameworks. The buyer attaches its code with the official
-`@x402/extensions/builder-code` client extension.
+form for other frameworks. The buyer attaches its code with
+`x402aff.buyer_client.BuilderCodeClientExtension` (Python) or the official
+`@x402/extensions/builder-code` client extension (TS).
 
 ## 3. Components
 
-All kit modules live in [`python/`](../python) (import them by bare name from
-there). The one-object [`affiliation.py`](../python/x402aff/affiliation.py) facade wraps
-the modules below.
+All kit modules live in the installable [`x402aff`](../python) package
+(`from x402aff import payto`, or `from x402aff import Affiliation` for the
+facade). The one-object [`affiliation.py`](../python/x402aff/affiliation.py)
+facade wraps the modules below.
 
-| File (`python/…`) | Role in the path |
+| File (`python/x402aff/…`) | Role in the path |
 |---|---|
 | `builder_code.py` | `declare_builder_code(a)` on the route; `parse_builder_code_suffix()` to decode `a`/`s`/`w` off a settle tx. |
 | `resolver.py` | Builder code → registered payout address (one `eth_call`, no keys). |

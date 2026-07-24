@@ -6,10 +6,17 @@ implementation validated end-to-end on Base mainnet.
 
 ## Install
 
+Not on PyPI - install from a checkout or straight from git:
+
 ```bash
-pip install ./python                 # or: pip install 'x402aff[cdp] @ ...'
-pip install 'x402aff[cdp]'           # add the CDP extra for discovery (monitor.py)
+pip install ./python                 # from a clone, at the repo root
+pip install '.[cdp]'                 # from inside python/, with the CDP extra
+pip install 'x402aff[cdp] @ git+https://github.com/MiroShark/x402aff@main#subdirectory=python'
 ```
+
+The `cdp` extra adds `cdp-sdk`, needed only for the CDP-index discovery path
+(`monitor`, `aff.scan()` / `pending()` / `splits_payload()`). Without it the
+request-time `payTo` and payout-calldata paths work fine.
 
 Vendoring instead of installing works too - copy `python/x402aff/` into your
 project as a subpackage; the modules import each other relatively, so nothing
@@ -39,6 +46,7 @@ Full integration guide (money path, trust model, wiring, caveats):
 
 | File | Role |
 |------|------|
+| `__init__.py` | The package's public surface (`from x402aff import Affiliation`, …). |
 | `affiliation.py` | **Start here.** The `Affiliation` facade wrapping everything below. |
 | `builder_code.py` | Declare `a`; decode `a`/`s`/`w` off a settle tx. |
 | `resolver.py` | Builder code → registered payout address (one `eth_call`). |
