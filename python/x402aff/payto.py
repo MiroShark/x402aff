@@ -37,9 +37,7 @@ import os
 from dataclasses import dataclass
 from typing import Optional
 
-import push_split
-import resolver
-import split
+from . import push_split, resolver, split
 
 # The header a buyer's client sets on the unpaid request. Same grammar as `s`.
 BUILDER_CODE_HEADER = "X-Builder-Code"
@@ -93,7 +91,7 @@ def builder_code_from_headers(headers) -> Optional[str]:
         return None
     # A header value is a bare string; split any comma-joined layering into the
     # list normalize_service_codes expects (it only splits lists, not strings).
-    from builder_code import normalize_service_codes
+    from .builder_code import normalize_service_codes
 
     items = raw.split(",") if isinstance(raw, str) else raw
     return split.primary_code(normalize_service_codes(items))

@@ -1,7 +1,7 @@
 # x402aff (TypeScript)
 
 The `Affiliation` facade for x402 sellers on the **Node / TypeScript** stack - a
-port of the repo's Python [`affiliation.py`](../python/affiliation.py). Same three
+port of the repo's Python [`affiliation.py`](../python/x402aff/affiliation.py). Same three
 on-chain reads, same safe-fallback contract, and it resolves the **identical
 split address** as the Python kit for a given `(seller, builder)` pair (the
 encoding is asserted byte-for-byte against the Python/`cast` bytes in the tests).
@@ -66,7 +66,7 @@ const info = { "builder-code": { info: { s: markedServiceCodes("bc_yourcode") } 
 //   accepts multiple). Discovery: settlements whose `s` includes AFFILIATION_MARKER.
 ```
 
-See [`../docs/INTEGRATION.md`](../docs/INTEGRATION.md) and [`../python/queries.sql`](../python/queries.sql) #5.
+See [`../docs/INTEGRATION.md`](../docs/INTEGRATION.md) and [`../python/x402aff/queries.sql`](../python/x402aff/queries.sql) #5.
 
 ## Develop
 

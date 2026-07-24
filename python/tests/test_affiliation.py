@@ -11,11 +11,9 @@ import asyncio
 
 import pytest
 
-import distribute
-import push_split
-import resolver
-from affiliation import Affiliation
-from builder_code import declare_builder_code
+from x402aff import distribute, push_split, resolver
+from x402aff.affiliation import Affiliation
+from x402aff.builder_code import declare_builder_code
 
 SELLER = "0x2222222222222222222222222222222222222222"
 BUILDER = "0x1111111111111111111111111111111111111111"
@@ -164,7 +162,7 @@ def test_release_skips_deploy_when_already_deployed(monkeypatch):
 
 
 def test_splits_payload_shapes_rows_and_filters_marker(monkeypatch):
-    import monitor
+    from x402aff import monitor
 
     _patch_registered(monkeypatch, deployed=False, balance=1_000_000)
     # Discovery is CDP-backed; stub it. The shared marker rides along as a
@@ -192,7 +190,7 @@ def test_splits_payload_makes_no_base_events_query(monkeypatch):
     tripped the CDP SQL API's leaf-scan limit (400) on every call - see
     queries.sql #5b. splits_payload must issue no such query, and must not
     resurrect the fields that only that query could populate."""
-    import monitor
+    from x402aff import monitor
 
     _patch_registered(monkeypatch, deployed=False, balance=1_000_000)
     monkeypatch.setattr(monitor, "discover_builder_codes",

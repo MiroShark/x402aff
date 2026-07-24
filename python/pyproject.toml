@@ -1,6 +1,35 @@
-# The Python kit is a set of flat modules (payto.py, split.py, …) that import
-# each other by top-level name. This puts python/ on sys.path for pytest so the
-# tests under tests/ resolve those imports.
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "x402aff"
+version = "0.1.0"
+description = "Builder-code affiliation for x402 sellers - route each payment to a per-(seller, builder) 0xSplits split."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+keywords = ["x402", "builder-codes", "0xsplits", "base", "affiliation"]
+dependencies = [
+    "requests>=2.28",
+    "cbor2>=5.4",
+]
+
+[project.optional-dependencies]
+# Discovery via the CDP SQL API: monitor.py, Affiliation.scan/pending/splits_payload.
+cdp = ["cdp-sdk>=1.0"]
+dev = ["pytest>=7.0"]
+
+[project.urls]
+Homepage = "https://github.com/MiroShark/x402aff"
+
+[tool.setuptools]
+packages = ["x402aff"]
+
+[tool.setuptools.package-data]
+# Ship the reference queries alongside the code they document.
+x402aff = ["queries.sql"]
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]

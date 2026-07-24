@@ -15,7 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
-import resolver
+from . import resolver
 
 # Default cut to the referer builder code. 1000 bps = 10% of the payment.
 DEFAULT_BUILDER_SHARE_BPS = 1000

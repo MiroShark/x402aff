@@ -14,7 +14,7 @@ broadcasting is yours (a funded Base account; gas is cents, and one distribute
 clears every payment that has accumulated in the pair since the last one).
 Use ``monitor.py`` to find which splits are holding funds ready to release.
 
-Run ``python3 distribute.py`` for an offline demo against a stubbed builder, or
+Run ``python3 -m x402aff.distribute`` for an offline demo against a stubbed builder, or
 ``distribute_plan(plan, rpc_url=...)`` to check the live on-chain balance first.
 """
 from __future__ import annotations
@@ -25,8 +25,7 @@ from typing import Optional
 
 import requests
 
-import push_split
-import split
+from . import push_split, split
 
 USDC_BASE = push_split.USDC_BASE
 _SEL_BALANCE_OF = "70a08231"  # balanceOf(address)

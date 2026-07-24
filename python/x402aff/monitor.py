@@ -14,7 +14,7 @@ This discovers them with zero local state, using CDP's own attribution index:
 Needs CDP_API_KEY_ID + CDP_API_KEY_SECRET (same CDP JWT auth as cdp_sql.py) and a Base
 RPC (set X402_BASE_RPC to a paid one - the balance reads add up).
 
-    X402_BUILDER_CODE=bc_...  X402_SELLER_PAYOUT=0x...  python3 monitor.py
+    X402_BUILDER_CODE=bc_...  X402_SELLER_PAYOUT=0x...  python3 -m x402aff.monitor
 """
 from __future__ import annotations
 
@@ -22,11 +22,7 @@ import os
 from dataclasses import dataclass
 from typing import Optional
 
-import cdp_sql
-import distribute
-import push_split
-import resolver
-import split
+from . import cdp_sql, distribute, push_split, resolver, split
 
 APP_CODE = os.environ.get("X402_BUILDER_CODE", "")
 SELLER_PAYOUT = os.environ.get("X402_SELLER_PAYOUT", "")

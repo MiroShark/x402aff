@@ -1,13 +1,25 @@
 # x402aff - Python
 
-The x402aff kit (Python): a set of flat modules that import each other by bare name, with
-the one-object [`affiliation.py`](./affiliation.py) facade on top. This is the
+The x402aff kit (Python): an installable `x402aff` package with the one-object
+[`Affiliation`](./x402aff/affiliation.py) facade on top. This is the
 implementation validated end-to-end on Base mainnet.
+
+## Install
+
+```bash
+pip install ./python                 # or: pip install 'x402aff[cdp] @ ...'
+pip install 'x402aff[cdp]'           # add the CDP extra for discovery (monitor.py)
+```
+
+Vendoring instead of installing works too - copy `python/x402aff/` into your
+project as a subpackage; the modules import each other relatively, so nothing
+needs rewriting and none of the generic names (`split`, `monitor`, `resolver`)
+leak into your top-level namespace.
 
 ## Use
 
 ```python
-from affiliation import Affiliation
+from x402aff import Affiliation
 
 aff = Affiliation(app_code="bc_yourcode", seller_payout="0xYourWallet")
 
@@ -35,12 +47,12 @@ Full integration guide (money path, trust model, wiring, caveats):
 | `payto.py` | Request-time `payTo` resolver. Cached, never raises. |
 | `distribute.py` | The (deploy + distribute) calldata to release a funded split. |
 | `monitor.py` | Which splits hold distributable funds (via CDP's index). |
-| `buyer_client.py` | Buyer-side extension that attaches `s`. |
+| `buyer_client.py` | Buyer-side extension that attaches `s` (via `marked_service_codes`). |
 | `cdp_sql.py` · `queries.sql` | CDP SQL API client + attribution queries. |
 
 ## Develop
 
 ```bash
-pip install -r requirements.txt   # requests, cbor2, pytest (+ cdp-sdk for monitor.py)
-pytest                            # runs tests/ (pyproject puts python/ on the path)
+pip install -e '.[cdp,dev]'   # editable install with the CDP + test extras
+pytest                        # runs tests/ against the x402aff package
 ```

@@ -100,6 +100,24 @@ def normalize_service_codes(raw: Any) -> str | None:
     return ",".join(valid) or None
 
 
+def marked_service_codes(code: str) -> list[str]:
+    """The buyer-side ``s`` codes to attach: your real builder ``code``, plus the
+    shared kit marker as a second entry.
+
+    ``buyer_client.BuilderCodeClientExtension`` applies this for you; reach for
+    this directly when you stamp ``s`` yourself - a different x402 client, the
+    official builder-code extension, or a hand-built extensions dict::
+
+        {"builder-code": {"info": {"s": marked_service_codes("bc_yourcode")}}}
+
+    The marker is dropped when it would duplicate ``code``. The split always pays
+    the PRIMARY (first) code, so this never changes a payout - it only makes the
+    payment discoverable (see queries.sql #5). Mirrors the TS
+    ``markedServiceCodes``.
+    """
+    return [code, AFFILIATION_MARKER] if AFFILIATION_MARKER != code else [code]
+
+
 def declare_builder_code(app_code: str) -> dict[str, Any]:
     """Build the builder-code extension dict for your x402 route's `extensions`.
 
