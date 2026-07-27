@@ -19,6 +19,10 @@ import {
   primaryCode,
   buildSplitPlan,
   amountsUnits,
+  distributableUnits,
+  payoutUnits,
+  isClaimable,
+  planIsClaimable,
   isDeployedCalldata,
   distributeCalldata,
   createSplitCalldata,
@@ -305,4 +309,66 @@ test("splitsPayload shapes rows and filters the marker", async () => {
   // The fields only the dead rollup could populate must stay gone.
   assert.ok(!("payments" in s));
   assert.ok(!("receivedUnits" in s));
+});
+
+// ── parity with the Python kit ────────────────────────────────────────────────
+//
+// These pin the three places the two ports had drifted apart. Each has a
+// counterpart in python/tests/ (test_split.py, test_affiliation.py).
+
+test("release() re-reads isDeployed instead of trusting the cache", async () => {
+  // The regression: PayTo is memoized, and `splitDeployed` is the one field in
+  // it that CHANGES - a split flips to deployed the first time anyone claims it.
+  // Serving the cached value kept emitting a deploy leg for a split that already
+  // exists, and createSplitDeterministic at an existing address reverts.
+  const opts = { payout: BUILDER, deployed: false, balance: 1_000_000n };
+  const a = aff(mockClient(opts));
+
+  const first = await a.release("bc_alice");
+  assert.deepEqual(first.calls.map((c) => c.step), ["deploy_split", "distribute"]);
+
+  opts.deployed = true; // someone claimed it (or the builder self-served)
+
+  const second = await a.release("bc_alice");
+  assert.deepEqual(second.calls.map((c) => c.step), ["distribute"]);
+});
+
+test("a settled split is not claimable, though its balance is non-zero", () => {
+  // The permanent floor of a two-way split: 1 unit retained, 1 unit that floors
+  // to zero for BOTH recipients. `balance > 0` and `distributable > 0` are both
+  // true here, which is exactly the trap.
+  assert.equal(distributableUnits(2n), 1n);
+  assert.deepEqual(payoutUnits(2n, [1000, 9000]), [0n, 0n]);
+  assert.equal(isClaimable(2n, [1000, 9000]), false);
+
+  // 3 units: the builder still floors to 0, but the seller nets 1.
+  assert.deepEqual(payoutUnits(3n, [1000, 9000]), [0n, 1n]);
+  assert.equal(isClaimable(3n, [1000, 9000]), true);
+
+  // Splits does not require totalAllocation == 10000.
+  assert.equal(isClaimable(101n, [1, 999], 1000n), true);
+  assert.equal(isClaimable(101n, [1, 999], 0n), false);
+
+  assert.equal(planIsClaimable(plan(), 2n), false);
+  assert.equal(planIsClaimable(plan(), 1_000_000n), true);
+});
+
+test("a builder payout equal to the seller collapses to a direct payment", () => {
+  // Two codes can share one payout wallet. Splitting a wallet against itself
+  // costs gas + dust for nothing.
+  const p = buildSplitPlan(SELLER, SELLER, "bc_self", 1000);
+  assert.equal(p.hasBuilder, false);
+  assert.deepEqual(p.recipients, [[SELLER, 10000]]);
+  // Case-insensitively: registry and RPC casing differ.
+  assert.equal(buildSplitPlan(SELLER.toUpperCase() as typeof SELLER, SELLER, "bc_self", 1000).hasBuilder, false);
+});
+
+test("amountsUnits sums duplicate recipients instead of overwriting", () => {
+  // A hand-built multi-recipient plan may legally list one address twice; the
+  // split pays it both legs. 99999 + 899999, each floored - not the 899999 that
+  // overwriting produced (which also inflated dust from 2 to 100001).
+  const p = { ...plan(), builderPayout: SELLER, recipients: [[SELLER, 1000], [SELLER, 9000]] as Array<[typeof SELLER, number]>, sellerPayout: SELLER };
+  const got = amountsUnits(p, 1_000_000n);
+  assert.equal(got.get(SELLER), 999_998n);
+  assert.equal(1_000_000n - 999_998n, 2n);
 });

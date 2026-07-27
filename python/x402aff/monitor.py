@@ -38,15 +38,28 @@ class SplitStatus:
     split_address: Optional[str]
     deployed: bool
     balance_units: int
+    #: The share this split was predicted at. Trails the positional fields so
+    #: existing constructor calls keep working; needed because "is this worth
+    #: distributing" depends on the allocation vector, not just the balance.
+    builder_share_bps: int = SHARE_BPS
 
     @property
     def distributable_units(self) -> int:
         # A PushSplit keeps 1 unit warm; only the rest can move.
-        return max(0, self.balance_units - split.SPLITS_RETAINED_UNITS)
+        return split.distributable_units(self.balance_units)
 
     @property
     def needs_distribution(self) -> bool:
-        return self.builder_payout is not None and self.distributable_units > 0
+        """Whether a distribute would actually pay someone.
+
+        Was ``distributable_units > 0``, which is true forever: a settled two-way
+        split floors at a permanent 2 units, so every scan re-reported it as
+        pending and a keeper looping on this burned gas moving nothing.
+        """
+        if self.builder_payout is None:
+            return False
+        allocations = [self.builder_share_bps, split.BPS_DENOM - self.builder_share_bps]
+        return split.is_claimable(self.balance_units, allocations)
 
 
 def discover_builder_codes(app_code: str, *, days: int = 90) -> list[str]:
@@ -83,7 +96,7 @@ def status_for(code: str, *, seller_payout: str, rpc_url: Optional[str] = None) 
                                   builder_share_bps=SHARE_BPS)
     addr, deployed = push_split.predict_split_address(plan, rpc_url=rpc_url)
     bal = distribute.split_balance_units(addr, rpc_url=rpc_url)
-    return SplitStatus(code, payout, addr, deployed, bal)
+    return SplitStatus(code, payout, addr, deployed, bal, SHARE_BPS)
 
 
 def scan(app_code: str, seller_payout: str, *, rpc_url: Optional[str] = None,

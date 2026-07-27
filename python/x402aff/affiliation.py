@@ -206,13 +206,13 @@ class Affiliation:
         info = resolver.resolve(code, rpc_url=self.rpc_url or push_split.BASE_RPC)
         payout = info.get("payout_address") if info.get("registered") else None
         if not payout:
-            return monitor.SplitStatus(code, None, None, False, 0)
+            return monitor.SplitStatus(code, None, None, False, 0, self._share)
         plan = split.build_split_plan(
             self.seller_payout, payout, builder_code=code, builder_share_bps=self._share
         )
         addr, deployed = push_split.predict_split_address(plan, rpc_url=self.rpc_url)
         bal = distribute.split_balance_units(addr, rpc_url=self.rpc_url)
-        return monitor.SplitStatus(code, payout, addr, deployed, bal)
+        return monitor.SplitStatus(code, payout, addr, deployed, bal, self._share)
 
     def splits_payload(self, *, days: int = 90) -> dict:
         """The claims-dashboard payload — every per-builder split for this seller,
@@ -250,9 +250,13 @@ class Affiliation:
                 "builderCode": code,
                 "builderShareBps": self._share,
                 "balanceUnits": str(balance),
+                "distributableUnits": str(split.distributable_units(balance)),
                 # deployed = no deploy leg needed (the split contract already exists).
                 "deployed": not any(c.step == "deploy_split" for c in calls),
-                "claimable": len(calls) > 0,
+                # Not `len(calls) > 0` - that is true for every attributed split,
+                # so a settled one (parked at its permanent 2-unit floor forever)
+                # rendered an eternal claim button that burned gas moving nothing.
+                "claimable": bool(calls) and pt.plan.is_claimable(balance),
                 "calls": [{"step": c.step, "target": c.target, "data": c.data} for c in calls],
             })
 

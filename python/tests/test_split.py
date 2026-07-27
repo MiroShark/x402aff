@@ -126,3 +126,68 @@ def test_resolve_and_plan_no_code_is_seller_only(monkeypatch):
     plan = split.resolve_and_plan(None, SELLER)
     assert not plan.has_builder
     assert not called
+
+
+# ── claimability: "is a distribute worth the gas" ─────────────────────────────
+#
+# The question every claims UI asks, and the one place it must be answered, so
+# the kit, its /splits payload and any dashboard built on them agree.
+
+
+def test_settled_two_way_split_is_not_claimable():
+    # A fully distributed two-way split parks here forever: 1 unit retained and
+    # 1 unit that floors to zero for BOTH recipients. `balance > 0` and even
+    # `distributable > 0` are true here, which is exactly the trap.
+    assert split.distributable_units(2) == 1
+    assert split.payout_units(2, [1000, 9000]) == [0, 0]
+    assert split.is_claimable(2, [1000, 9000]) is False
+
+
+def test_claimable_once_any_recipient_nets_a_unit():
+    # 3 units: the builder still floors to 0, but the seller nets 1 - so the
+    # call does move money and is worth sending.
+    assert split.payout_units(3, [1000, 9000]) == [0, 1]
+    assert split.is_claimable(3, [1000, 9000]) is True
+    assert split.is_claimable(11, [1000, 9000]) is True
+
+
+def test_is_claimable_handles_foreign_allocation_vectors():
+    # Splits does not require totalAllocation == 10000; reading someone else's
+    # split off-chain gives whatever they created it with.
+    assert split.is_claimable(101, [1, 999], total_allocation=1000) is True
+    assert split.is_claimable(101, [1, 999], total_allocation=0) is False
+
+
+def test_plan_is_claimable_uses_its_own_recipients():
+    plan = split.build_split_plan(SELLER, BUILDER, builder_share_bps=1000)
+    assert plan.is_claimable(2) is False
+    assert plan.is_claimable(1_000_000) is True
+
+
+# ── degenerate self-splits ────────────────────────────────────────────────────
+
+
+def test_builder_payout_equal_to_seller_collapses_to_a_direct_payment():
+    # Two codes can share one payout wallet (or a seller's own code arrives as
+    # `s`). Splitting a wallet against itself costs gas + dust for nothing.
+    plan = split.build_split_plan(SELLER, SELLER, builder_code="bc_self")
+    assert plan.has_builder is False
+    assert plan.recipients == [(SELLER, 10_000)]
+    # Case-insensitively, since registry and RPC casing differ.
+    assert split.build_split_plan(SELLER.upper(), SELLER, builder_code="bc_self").has_builder is False
+
+
+def test_amounts_sum_duplicate_recipients_instead_of_overwriting():
+    # A hand-built multi-recipient plan may legally list one address twice. The
+    # split pays it both legs; keying by address without summing dropped one.
+    plan = split.SplitPlan(
+        seller_payout=SELLER,
+        builder_code="bc_dup",
+        builder_payout=SELLER,
+        builder_share_bps=1000,
+        recipients=[(SELLER, 1000), (SELLER, 9000)],
+    )
+    # 99999 + 899999: both legs, each floored, summed - not the 899999 that
+    # overwriting produced (which also inflated dust from 2 to 100001).
+    assert plan.amounts_units(1.00) == {SELLER: 999_998}
+    assert plan.dust_units(1.00) == 2

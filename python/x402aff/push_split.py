@@ -127,10 +127,36 @@ def predict_split_address(
     return _decode_is_deployed(body["result"])
 
 
+def to_checksum_address(address: str) -> str:
+    """EIP-55 an address, if we can do it without a hard keccak dependency.
+
+    Why bother: this address goes straight into the 402 as ``payTo``. Comparisons
+    against ``payTo`` are case-insensitive throughout x402 and CDP's facilitator
+    does not care, but a **web3.py-based** facilitator (or a self-verifying
+    seller) refuses to encode a non-checksummed recipient when it simulates the
+    transfer, and the refusal surfaces as a misleading ``insufficient_balance``
+    with the checksum complaint buried in the revert.
+
+    ``eth_utils`` is imported lazily and is NOT a dependency: this module speaks
+    raw JSON-RPC precisely so the kit needs no keccak library (see resolver.py).
+    Any real x402 seller already has it via ``x402[evm]``; if it is genuinely
+    absent we return the lowercase form, which is what the kit always returned
+    and is still a valid address.
+    """
+    try:
+        from eth_utils import to_checksum_address as _eip55
+    except ImportError:
+        return address
+    try:
+        return _eip55(address)
+    except Exception:  # noqa: BLE001 - never let formatting break a 402
+        return address
+
+
 def _decode_is_deployed(result: str) -> tuple[str, bool]:
     """Decode isDeployed's (address split, bool exists) return words."""
     words = result.removeprefix("0x")
-    return "0x" + words[24:64], int(words[64:128], 16) != 0
+    return to_checksum_address("0x" + words[24:64]), int(words[64:128], 16) != 0
 
 
 if __name__ == "__main__":
