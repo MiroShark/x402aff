@@ -35,6 +35,11 @@ dependencies = [
     # lowercase form and hitting exactly the bug this prevents. Costs a real seller
     # nothing: x402[evm] already pulls it in via eth-account.
     "eth-utils>=2.0",
+    # eth-hash ships with NO keccak backend by default, and eth-utils does not
+    # pick one - so `to_checksum_address` raises unless a backend is present.
+    # Naming it here is what makes the checksum actually happen on a clean
+    # install; without it CI silently produced lowercase addresses.
+    "eth-hash[pycryptodome]>=0.3.1",
 ]
 
 [project.optional-dependencies]

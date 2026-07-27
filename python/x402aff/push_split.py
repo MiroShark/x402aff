@@ -18,12 +18,18 @@ just ``requests`` for the one eth_call, mirroring ``resolver.py``.
 """
 from __future__ import annotations
 
+import logging
 import os
 from typing import Optional
 
 import requests
 
 from . import resolver, split
+
+log = logging.getLogger("x402aff.push_split")
+
+# Warn once, not per 402: a broken install would otherwise flood the log.
+_CHECKSUM_WARNED = False
 
 # ── Base mainnet addresses ────────────────────────────────────────────────────
 USDC_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
@@ -141,14 +147,28 @@ def to_checksum_address(address: str) -> str:
     purpose. Everything else here speaks raw JSON-RPC so the kit needs no keccak
     library (see resolver.py), and making this the one exception is tempting to
     fudge - but a soft fallback would leave a minimal install silently emitting
-    the lowercase form and hitting the exact bug this exists to prevent. The
-    guard below is only for a broken install: formatting must never break a 402.
+    the lowercase form and hitting the exact bug this exists to prevent.
+
+    Note ``eth-hash[pycryptodome]`` is declared too: eth-hash ships with no
+    keccak backend, and without one this raises rather than returning the wrong
+    case. The guard below therefore means a genuinely broken install, so it
+    warns instead of failing quietly - formatting must never break a 402, but it
+    must not degrade in silence either.
     """
+    global _CHECKSUM_WARNED
     try:
         from eth_utils import to_checksum_address as _eip55
 
         return _eip55(address)
-    except Exception:  # noqa: BLE001 - never let formatting break a 402
+    except Exception as exc:  # noqa: BLE001 - never let formatting break a 402
+        if not _CHECKSUM_WARNED:
+            _CHECKSUM_WARNED = True
+            log.warning(
+                "cannot EIP-55 %s (%s: %s) - advertising lowercase payTo. Install "
+                "eth-utils and a keccak backend (eth-hash[pycryptodome]); a "
+                "web3.py-based facilitator rejects a non-checksummed recipient.",
+                address, type(exc).__name__, exc,
+            )
         return address
 
 
