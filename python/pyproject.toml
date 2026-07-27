@@ -28,6 +28,13 @@ classifiers = [
 dependencies = [
     "requests>=2.28",
     "cbor2>=5.4",
+    # EIP-55 for the predicted split address, which goes straight into the 402 as
+    # payTo: a web3.py-based facilitator rejects a non-checksummed recipient. This
+    # is the one thing here that needs keccak, and it has to be deterministic - a
+    # lazily-imported optional would leave a minimal install silently emitting the
+    # lowercase form and hitting exactly the bug this prevents. Costs a real seller
+    # nothing: x402[evm] already pulls it in via eth-account.
+    "eth-utils>=2.0",
 ]
 
 [project.optional-dependencies]

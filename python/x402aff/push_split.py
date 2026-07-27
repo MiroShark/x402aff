@@ -128,7 +128,7 @@ def predict_split_address(
 
 
 def to_checksum_address(address: str) -> str:
-    """EIP-55 an address, if we can do it without a hard keccak dependency.
+    """EIP-55 an address.
 
     Why bother: this address goes straight into the 402 as ``payTo``. Comparisons
     against ``payTo`` are case-insensitive throughout x402 and CDP's facilitator
@@ -137,17 +137,16 @@ def to_checksum_address(address: str) -> str:
     transfer, and the refusal surfaces as a misleading ``insufficient_balance``
     with the checksum complaint buried in the revert.
 
-    ``eth_utils`` is imported lazily and is NOT a dependency: this module speaks
-    raw JSON-RPC precisely so the kit needs no keccak library (see resolver.py).
-    Any real x402 seller already has it via ``x402[evm]``; if it is genuinely
-    absent we return the lowercase form, which is what the kit always returned
-    and is still a valid address.
+    ``eth_utils`` is a declared dependency rather than a lazy optional on
+    purpose. Everything else here speaks raw JSON-RPC so the kit needs no keccak
+    library (see resolver.py), and making this the one exception is tempting to
+    fudge - but a soft fallback would leave a minimal install silently emitting
+    the lowercase form and hitting the exact bug this exists to prevent. The
+    guard below is only for a broken install: formatting must never break a 402.
     """
     try:
         from eth_utils import to_checksum_address as _eip55
-    except ImportError:
-        return address
-    try:
+
         return _eip55(address)
     except Exception:  # noqa: BLE001 - never let formatting break a 402
         return address
