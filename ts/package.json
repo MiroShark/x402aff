@@ -1,6 +1,6 @@
 {
   "name": "x402aff",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Builder-code affiliation for x402 sellers - the Affiliation facade (TypeScript port of affiliation.py).",
   "type": "module",
   "exports": {
