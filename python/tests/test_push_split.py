@@ -74,7 +74,10 @@ def test_decode_is_deployed():
               + "0000000000000000000000004ede36f2e215a06856612d4b98afa56c3afffa66"
               + "0000000000000000000000000000000000000000000000000000000000000000")
     addr, exists = push_split._decode_is_deployed(result)
-    assert addr == "0x4ede36f2e215a06856612d4b98afa56c3afffa66"
+    # EIP-55, not the raw lowercase word: this address goes into the 402 as
+    # payTo, and a web3.py-based facilitator rejects a non-checksummed recipient.
+    assert addr == "0x4eDe36f2e215A06856612D4B98Afa56c3aFfFA66"
+    assert addr.lower() == "0x4ede36f2e215a06856612d4b98afa56c3afffa66"
     assert exists is False
     _, exists = push_split._decode_is_deployed(result[:66] + "0" * 63 + "1")
     assert exists is True
@@ -99,6 +102,6 @@ def test_predict_split_address_parses_rpc_result(monkeypatch):
 
     monkeypatch.setattr(push_split.requests, "post", _post)
     addr, exists = push_split.predict_split_address(_plan())
-    assert addr == "0x4ede36f2e215a06856612d4b98afa56c3afffa66"
+    assert addr == "0x4eDe36f2e215A06856612D4B98Afa56c3aFfFA66"
     assert exists is False
     assert captured["to"] == push_split.SPLITS_PUSH_FACTORY

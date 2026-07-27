@@ -5,6 +5,9 @@
 # Core (builder_code decode path + all HTTP/RPC calls)
 requests>=2.28
 cbor2>=5.4
+# EIP-55 for the predicted split address before it goes into the 402 as payTo.
+eth-utils>=2.0
+eth-hash[pycryptodome]>=0.3.1
 
 # Optional: CDP SQL API path (monitor.py) - mints the Bearer JWT
 # cdp-sdk>=1.0

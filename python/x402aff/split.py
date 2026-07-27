@@ -68,14 +68,29 @@ class SplitPlan:
 
         Both effects only apply when the money actually flows through a split. A
         builderless plan is a plain USDC transfer, so the seller gets every unit.
+
+        Shares are **summed** per address, not overwritten: a plan may legally
+        list one address twice (a hand-built multi-recipient ``SplitPlan`` where
+        a partner is also the seller), and the split pays it both legs. Keying
+        the result by address without summing silently dropped one of them, which
+        under-reported the payout by a whole leg and inflated ``dust_units``.
         """
         units = to_units(price_usd)
         if not self.has_builder:
             return {self.seller_payout: units}
         distributable = max(0, units - SPLITS_RETAINED_UNITS)
-        return {
-            addr: distributable * bps // BPS_DENOM for addr, bps in self.recipients
-        }
+        out: dict[str, int] = {}
+        for addr, bps in self.recipients:
+            out[addr] = out.get(addr, 0) + distributable * bps // BPS_DENOM
+        return out
+
+    def is_claimable(self, balance_units: int) -> bool:
+        """Would a ``distribute`` at this balance actually pay anyone?
+
+        The question the claims UI needs, and it is **not** ``balance > 0`` - see
+        the module-level :func:`is_claimable`.
+        """
+        return is_claimable(balance_units, [bps for _, bps in self.recipients])
 
     def dust_units(self, price_usd: float) -> int:
         """Units left behind in the split (retained unit + floor remainders).
@@ -93,6 +108,57 @@ class SplitPlan:
         }
 
 
+def distributable_units(balance_units: int) -> int:
+    """The part of a split's balance a ``distribute`` can move at all.
+
+    A PushSplit keeps ``SPLITS_RETAINED_UNITS`` behind to hold its balance slot
+    warm, so this is ``balance - 1``. Still not the same as "worth claiming" -
+    see :func:`is_claimable`.
+    """
+    return max(0, balance_units - SPLITS_RETAINED_UNITS)
+
+
+def payout_units(
+    balance_units: int,
+    allocations,
+    total_allocation: int = BPS_DENOM,
+) -> list[int]:
+    """What each recipient nets from a ``distribute`` at this balance, floored.
+
+    ``allocations`` is the split's allocation vector in recipient order.
+    ``total_allocation`` defaults to :data:`BPS_DENOM` because that is what this
+    kit's plans use, but Splits does not require it - pass the split's own value
+    when reading someone else's split off-chain.
+    """
+    allocations = list(allocations)
+    if total_allocation <= 0:
+        return [0] * len(allocations)
+    dist = distributable_units(balance_units)
+    return [dist * int(a) // total_allocation for a in allocations]
+
+
+def is_claimable(
+    balance_units: int,
+    allocations,
+    total_allocation: int = BPS_DENOM,
+) -> bool:
+    """Is sending a ``distribute`` actually worth the gas?
+
+    **Not** ``balance > 0``, and not ``distributable > 0`` either. A fully
+    distributed split settles at a permanent floor of ``SPLITS_RETAINED_UNITS +
+    len(recipients) - 1`` (2 units for the two-way case): one unit is retained,
+    and the leftover unit floors to zero for *every* recipient. Gating a claim
+    button on a non-zero balance therefore leaves an eternal "claim me" on a
+    split that is already settled, and each click burns gas to move nothing.
+
+    So the real question is whether **any** recipient nets at least one base
+    unit. Note a claimable split can still pay a *particular* recipient zero:
+    at 3 units of a 10/90 split the builder floors to 0 and only the seller nets
+    anything.
+    """
+    return any(u > 0 for u in payout_units(balance_units, allocations, total_allocation))
+
+
 def build_split_plan(
     seller_payout: str,
     builder_payout: Optional[str],
@@ -104,11 +170,21 @@ def build_split_plan(
 
     ``builder_payout`` None/empty (unregistered or no ``s``) → seller gets 100%.
     Raises ValueError on a missing seller or an out-of-range share.
+
+    A builder whose payout **is** the seller's own wallet also yields a
+    seller-only plan. Two codes can share a payout (both registered to one
+    wallet), and a seller's own code used as the ``s`` does it trivially. Routing
+    that through a split would send the seller's money to a contract and charge
+    them gas plus dust to get it back, splitting a wallet against itself for no
+    benefit - so it is collapsed to a direct payment instead.
     """
     if not seller_payout:
         raise ValueError("seller_payout is required")
     if not (0 <= builder_share_bps <= BPS_DENOM):
         raise ValueError(f"builder_share_bps must be 0..{BPS_DENOM}")
+
+    if builder_payout and builder_payout.lower() == seller_payout.lower():
+        builder_payout = None
 
     if builder_payout and builder_share_bps > 0:
         recipients = [

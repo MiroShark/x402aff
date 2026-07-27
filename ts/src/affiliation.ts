@@ -221,7 +221,13 @@ export function primaryCode(raw: string | null | undefined): string | null {
   return null;
 }
 
-/** Build a split plan from already-resolved addresses. */
+/** Build a split plan from already-resolved addresses.
+ *
+ *  A builder whose payout IS the seller's own wallet yields a seller-only plan.
+ *  Two codes can share a payout (both registered to one wallet), and a seller's
+ *  own code arriving as `s` does it trivially. Routing that through a split
+ *  would send the seller's money to a contract and charge them gas plus dust to
+ *  get it back, splitting a wallet against itself for no benefit. */
 export function buildSplitPlan(
   sellerPayout: Address,
   builderPayout: Address | null,
@@ -231,6 +237,9 @@ export function buildSplitPlan(
   if (!sellerPayout) throw new Error("sellerPayout is required");
   if (!(builderShareBps >= 0 && builderShareBps <= BPS_DENOM)) {
     throw new RangeError(`builderShareBps must be 0..${BPS_DENOM}`);
+  }
+  if (builderPayout && builderPayout.toLowerCase() === sellerPayout.toLowerCase()) {
+    builderPayout = null;
   }
   if (builderPayout && builderShareBps > 0) {
     return {
@@ -255,15 +264,68 @@ export function buildSplitPlan(
   };
 }
 
-/** What each recipient actually receives on-chain (mirrors 0xSplits exactly). */
+/** What each recipient actually receives on-chain (mirrors 0xSplits exactly).
+ *
+ *  Shares are SUMMED per address, not overwritten: a plan may legally list one
+ *  address twice (a hand-built multi-recipient plan where a partner is also the
+ *  seller), and the split pays it both legs. Keying by address without summing
+ *  silently dropped a leg and inflated the apparent dust. */
 export function amountsUnits(plan: SplitPlan, priceUnits: bigint): Map<Address, bigint> {
   if (!plan.hasBuilder) return new Map([[plan.sellerPayout, priceUnits]]);
   const distributable = priceUnits > SPLITS_RETAINED_UNITS ? priceUnits - SPLITS_RETAINED_UNITS : 0n;
   const out = new Map<Address, bigint>();
   for (const [addr, bps] of plan.recipients) {
-    out.set(addr, (distributable * BigInt(bps)) / BigInt(BPS_DENOM));
+    const share = (distributable * BigInt(bps)) / BigInt(BPS_DENOM);
+    out.set(addr, (out.get(addr) ?? 0n) + share);
   }
   return out;
+}
+
+/** The part of a split's balance a `distribute` can move at all (balance minus
+ *  the warm unit). Still not the same as "worth claiming" - see isClaimable. */
+export function distributableUnits(balanceUnits: bigint): bigint {
+  const d = balanceUnits - SPLITS_RETAINED_UNITS;
+  return d > 0n ? d : 0n;
+}
+
+/** What each recipient nets from a `distribute` at this balance, floored.
+ *  `totalAllocation` defaults to BPS_DENOM because that is what this kit's plans
+ *  use, but Splits does not require it - pass the split's own value when reading
+ *  someone else's split off-chain. */
+export function payoutUnits(
+  balanceUnits: bigint,
+  allocations: readonly (bigint | number)[],
+  totalAllocation: bigint = BigInt(BPS_DENOM),
+): bigint[] {
+  if (totalAllocation <= 0n) return allocations.map(() => 0n);
+  const dist = distributableUnits(balanceUnits);
+  return allocations.map((a) => (dist * BigInt(a)) / totalAllocation);
+}
+
+/**
+ * Is sending a `distribute` actually worth the gas?
+ *
+ * NOT `balance > 0`, and not `distributable > 0` either. A fully distributed
+ * split settles at a permanent floor of `SPLITS_RETAINED_UNITS + recipients - 1`
+ * (2 units for the two-way case): one unit is retained, and the leftover unit
+ * floors to zero for EVERY recipient. Gating a claim button on a non-zero
+ * balance therefore leaves an eternal "claim me" on a split that is already
+ * settled, and each click burns gas to move nothing.
+ *
+ * Note a claimable split can still pay a PARTICULAR recipient zero: at 3 units
+ * of a 10/90 split the builder floors to 0 and only the seller nets anything.
+ */
+export function isClaimable(
+  balanceUnits: bigint,
+  allocations: readonly (bigint | number)[],
+  totalAllocation: bigint = BigInt(BPS_DENOM),
+): boolean {
+  return payoutUnits(balanceUnits, allocations, totalAllocation).some((u) => u > 0n);
+}
+
+/** isClaimable for a plan, using its own allocation vector. */
+export function planIsClaimable(plan: SplitPlan, balanceUnits: bigint): boolean {
+  return isClaimable(balanceUnits, plan.recipients.map(([, bps]) => bps));
 }
 
 function splitStruct(plan: SplitPlan) {
@@ -329,6 +391,8 @@ export interface SplitRow {
   builderCode: string;
   builderShareBps: number;
   balanceUnits: string;
+  /** What a `distribute` can move (balance minus the split's warm unit). */
+  distributableUnits: string;
   deployed: boolean;
   claimable: boolean;
   calls: { step: DistributeCall["step"]; target: Address; data: Hex }[];
@@ -477,12 +541,22 @@ export class Affiliation {
     return this.splitBalance(pt.address);
   }
 
-  /** Build the release calls + live balance for one builder's split. */
+  /** Build the release calls + live balance for one builder's split.
+   *
+   *  Re-reads `isDeployed` rather than trusting `pt.splitDeployed`. That field is
+   *  memoized with the rest of the PayTo, and deployment is the one part of it
+   *  that CHANGES: the address and the payout are immutable, but a split flips
+   *  to deployed the first time anyone claims it. Reading the cached value meant
+   *  a long-lived process kept emitting a `deploy_split` leg for a split that
+   *  already exists, and `createSplitDeterministic` at an existing address
+   *  reverts - taking an atomic deploy+distribute batch down with it. Python's
+   *  `distribute.distribute_plan` has always re-read this; now both ports agree. */
   async release(code: string, opts?: { distributor?: Address }): Promise<{ calls: DistributeCall[]; balanceUnits: bigint }> {
     const pt = await this.resolve(code);
     if (!pt.plan.hasBuilder) return { calls: [], balanceUnits: 0n };
-    const balanceUnits = await this.splitBalance(pt.address);
-    const calls = this.distributeCalls(pt.plan, pt.address, pt.splitDeployed, opts?.distributor);
+    const [address, deployed] = await this.predictSplitAddress(pt.plan);
+    const balanceUnits = await this.splitBalance(address);
+    const calls = this.distributeCalls(pt.plan, address, deployed, opts?.distributor);
     return { calls, balanceUnits };
   }
 
@@ -515,12 +589,23 @@ export class Affiliation {
         builderCode: code,
         builderShareBps: this.builderShareBps,
         balanceUnits: balanceUnits.toString(),
+        distributableUnits: distributableUnits(balanceUnits).toString(),
         deployed: !calls.some((c) => c.step === "deploy_split"),
-        claimable: calls.length > 0,
+        // Not `calls.length > 0` - that is true for every attributed split, so a
+        // settled one (parked at its permanent 2-unit floor forever) rendered an
+        // eternal claim button that burned gas moving nothing.
+        claimable: calls.length > 0 && planIsClaimable(pt.plan, balanceUnits),
         calls: calls.map((c) => ({ step: c.step, target: c.target, data: c.data })),
       });
     }
-    splits.sort((a, b) => (BigInt(b.balanceUnits) > BigInt(a.balanceUnits) ? 1 : -1));
+    // Fullest first. A comparator that never returns 0 orders ties arbitrarily
+    // and is not a valid ordering, so equal balances used to shuffle between
+    // reads; this matches Python's `sort(key=..., reverse=True)`.
+    splits.sort((a, b) => {
+      const x = BigInt(a.balanceUnits);
+      const y = BigInt(b.balanceUnits);
+      return y > x ? 1 : y < x ? -1 : 0;
+    });
     return { configured: true, marker: AFFILIATION_MARKER, count: splits.length, splits };
   }
 

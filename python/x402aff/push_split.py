@@ -18,12 +18,18 @@ just ``requests`` for the one eth_call, mirroring ``resolver.py``.
 """
 from __future__ import annotations
 
+import logging
 import os
 from typing import Optional
 
 import requests
 
 from . import resolver, split
+
+log = logging.getLogger("x402aff.push_split")
+
+# Warn once, not per 402: a broken install would otherwise flood the log.
+_CHECKSUM_WARNED = False
 
 # ── Base mainnet addresses ────────────────────────────────────────────────────
 USDC_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
@@ -127,10 +133,49 @@ def predict_split_address(
     return _decode_is_deployed(body["result"])
 
 
+def to_checksum_address(address: str) -> str:
+    """EIP-55 an address.
+
+    Why bother: this address goes straight into the 402 as ``payTo``. Comparisons
+    against ``payTo`` are case-insensitive throughout x402 and CDP's facilitator
+    does not care, but a **web3.py-based** facilitator (or a self-verifying
+    seller) refuses to encode a non-checksummed recipient when it simulates the
+    transfer, and the refusal surfaces as a misleading ``insufficient_balance``
+    with the checksum complaint buried in the revert.
+
+    ``eth_utils`` is a declared dependency rather than a lazy optional on
+    purpose. Everything else here speaks raw JSON-RPC so the kit needs no keccak
+    library (see resolver.py), and making this the one exception is tempting to
+    fudge - but a soft fallback would leave a minimal install silently emitting
+    the lowercase form and hitting the exact bug this exists to prevent.
+
+    Note ``eth-hash[pycryptodome]`` is declared too: eth-hash ships with no
+    keccak backend, and without one this raises rather than returning the wrong
+    case. The guard below therefore means a genuinely broken install, so it
+    warns instead of failing quietly - formatting must never break a 402, but it
+    must not degrade in silence either.
+    """
+    global _CHECKSUM_WARNED
+    try:
+        from eth_utils import to_checksum_address as _eip55
+
+        return _eip55(address)
+    except Exception as exc:  # noqa: BLE001 - never let formatting break a 402
+        if not _CHECKSUM_WARNED:
+            _CHECKSUM_WARNED = True
+            log.warning(
+                "cannot EIP-55 %s (%s: %s) - advertising lowercase payTo. Install "
+                "eth-utils and a keccak backend (eth-hash[pycryptodome]); a "
+                "web3.py-based facilitator rejects a non-checksummed recipient.",
+                address, type(exc).__name__, exc,
+            )
+        return address
+
+
 def _decode_is_deployed(result: str) -> tuple[str, bool]:
     """Decode isDeployed's (address split, bool exists) return words."""
     words = result.removeprefix("0x")
-    return "0x" + words[24:64], int(words[64:128], 16) != 0
+    return to_checksum_address("0x" + words[24:64]), int(words[64:128], 16) != 0
 
 
 if __name__ == "__main__":
