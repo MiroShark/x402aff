@@ -111,7 +111,7 @@ opens a *new* split per builder - old funds stay safe at the old ratio.
 
 **More than two recipients** (platform fee, partner, …). Any recipients whose
 allocations sum to `10000`: build a `SplitPlan` directly and address-prediction +
-distribute just work. See **Customize** in [`INTEGRATION.md`](./docs/INTEGRATION.md).
+distribute just work.
 
 **Release payouts.** `aff.pending()` (or `python3 -m x402aff.monitor` as a CLI)
 discovers every builder who paid you straight from CDP's index - no local ledger -

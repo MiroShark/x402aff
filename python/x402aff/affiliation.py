@@ -35,10 +35,13 @@ actually use CDP-index discovery.
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from . import distribute, payto, push_split, resolver, split
 from .builder_code import AFFILIATION_MARKER, declare_builder_code
+
+if TYPE_CHECKING:  # annotations only - keeps `monitor` (and cdp-sdk) lazy at runtime
+    from . import monitor
 
 log = logging.getLogger("affiliation")
 
@@ -88,12 +91,12 @@ class Affiliation:
             if builder_share_bps is None
             else builder_share_bps
         )
-        self._extensions: Optional[dict] = None
+        self._extensions: Optional[dict[str, Any]] = None
 
     # ── request path ─────────────────────────────────────────────────────────
 
     @property
-    def extensions(self) -> dict:
+    def extensions(self) -> dict[str, Any]:
         """The route ``extensions`` that declare your app code ``a``.
 
         Merge into any extensions you already advertise:
@@ -108,7 +111,7 @@ class Affiliation:
 
         Pass as ``PaymentOption(pay_to=aff.pay_to)``. Reads ``X-Builder-Code`` off
         the request context and returns the per-pair split address, or the seller
-        wallet when there's no/unknown/​unresolvable code.
+        wallet when there's no/unknown/unresolvable code.
         """
         return self.resolve(ctx).address
 
@@ -170,7 +173,9 @@ class Affiliation:
             return 0
         return distribute.split_balance_units(pt.address, rpc_url=self.rpc_url)
 
-    def release(self, code: str, *, distributor: Optional[str] = None):
+    def release(
+        self, code: str, *, distributor: Optional[str] = None
+    ) -> tuple[list[distribute.DistributeCall], int]:
         """Build the release calls + live balance for one builder's split.
 
         Returns ``(calls, balance_units)`` - submit each ``(target, data)`` from
@@ -181,7 +186,7 @@ class Affiliation:
             pt.plan, rpc_url=self.rpc_url, distributor=distributor
         )
 
-    def scan(self, *, days: int = 90):
+    def scan(self, *, days: int = 90) -> list["monitor.SplitStatus"]:
         """Every builder who paid you and their split's balance (fullest first).
 
         Needs ``cdp-sdk`` - discovery uses CDP's attribution index (no local
@@ -194,11 +199,11 @@ class Affiliation:
         rows.sort(key=lambda s: s.balance_units, reverse=True)
         return rows
 
-    def pending(self, *, days: int = 90):
+    def pending(self, *, days: int = 90) -> list["monitor.SplitStatus"]:
         """The subset of :meth:`scan` whose splits hold distributable funds."""
         return [s for s in self.scan(days=days) if s.needs_distribution]
 
-    def _status_for(self, code: str):
+    def _status_for(self, code: str) -> "monitor.SplitStatus":
         """One builder's split status at THIS facade's share (keeps the predicted
         address consistent with what :meth:`pay_to` advertises)."""
         from . import monitor
@@ -215,14 +220,14 @@ class Affiliation:
         return monitor.SplitStatus(code, payout, addr, deployed, bal, self._share)
 
     def splits_payload(self, *, days: int = 90) -> dict:
-        """The claims-dashboard payload — every per-builder split for this seller,
+        """The claims-dashboard payload - every per-builder split for this seller,
         ready to serialize to JSON. One reusable call behind a ``/splits`` route.
 
         Each row carries the split address, its codes + share, live balance,
         deployed state, and a permissionless ``[deploy?, distribute]`` claim.
         Discovery is by our app code ``a`` (CDP); the claim is reconstructed from
         the seller wallet THIS facade holds, so even undeployed splits build with
-        no guessing. The shared marker and any unregistered/​unresolvable builder
+        no guessing. The shared marker and any unregistered/unresolvable builder
         code are skipped.
 
         No per-split payment count: the query that would produce one 400s on

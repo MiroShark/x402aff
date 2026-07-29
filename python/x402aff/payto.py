@@ -130,7 +130,7 @@ def payto_for_request(
             code,
             seller,
             builder_share_bps=share,
-            rpc_url=rpc_url or resolver.DEFAULT_RPC,
+            rpc_url=rpc_url or resolver.BASE_RPC,
         )
         if not plan.has_builder:
             # Resolved fine, but this code isn't registered *yet*. Deliberately

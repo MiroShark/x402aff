@@ -86,7 +86,7 @@ See [`../docs/INTEGRATION.md`](../docs/INTEGRATION.md) and [`../python/x402aff/q
 
 ```bash
 npm run typecheck   # tsc --noEmit
-npm test            # node --test (offline, mock viem transport) - 19 tests
+npm test            # node --test (offline, mock viem transport) - 23 tests
 ```
 
-Runs on Node ≥ 22 via built-in TypeScript type-stripping; no build step.
+Runs on Node ≥ 22.18 via built-in TypeScript type-stripping; no build step.

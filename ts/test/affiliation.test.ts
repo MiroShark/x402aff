@@ -313,8 +313,8 @@ test("splitsPayload shapes rows and filters the marker", async () => {
 
 // ── parity with the Python kit ────────────────────────────────────────────────
 //
-// These pin the three places the two ports had drifted apart. Each has a
-// counterpart in python/tests/ (test_split.py, test_affiliation.py).
+// Each of these has a counterpart in python/tests/ (test_split.py,
+// test_affiliation.py) - the two ports must agree on all of them.
 
 test("release() re-reads isDeployed instead of trusting the cache", async () => {
   // The regression: PayTo is memoized, and `splitDeployed` is the one field in

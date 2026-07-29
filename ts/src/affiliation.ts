@@ -73,7 +73,7 @@ export const AFFILIATION_MARKER = "x402aff";
 
 /**
  * The buyer-side `s` codes to attach: your real builder `code`, plus the kit
- * marker as a second entry (the marker is dropped if invalid or equal to `code`).
+ * marker as a second entry (the marker is dropped when it would duplicate `code`).
  * Feed the result to whatever sets the payment's `s`, e.g.
  * `{ "builder-code": { info: { s: markedServiceCodes("bc_you") } } }`. The split
  * still pays the primary code (`code`), so the marker never changes a payout.
@@ -158,13 +158,21 @@ const ERC20_ABI = [
 ] as const;
 
 // ── plain-data types ─────────────────────────────────────────────────────────
+
+/** One `[address, allocationBps]` leg of a split. Hand-build these for a
+ *  multi-recipient plan (see the README). */
+export type Recipient = [Address, number];
+
+/** What `resolve`/`payToFor` accept: a raw code, or anything header-shaped. */
+export type PayToSource = string | null | undefined | Headers | Record<string, unknown> | Map<string, unknown>;
+
 export interface SplitPlan {
   sellerPayout: Address;
   builderCode: string | null;
   builderPayout: Address | null;
   builderShareBps: number;
   /** `[address, allocationBps][]`, summing to BPS_DENOM - the PushSplit's shape. */
-  recipients: Array<[Address, number]>;
+  recipients: Recipient[];
   hasBuilder: boolean;
 }
 
@@ -395,7 +403,7 @@ export interface SplitRow {
   distributableUnits: string;
   deployed: boolean;
   claimable: boolean;
-  calls: { step: DistributeCall["step"]; target: Address; data: Hex }[];
+  calls: Omit<DistributeCall, "summary">[];
 }
 
 export interface SplitsPayload {
@@ -474,14 +482,12 @@ export class Affiliation {
   }
 
   /** The `payTo` address for a request - the split, or the seller wallet. Never throws. */
-  async payToFor(source: string | null | undefined | Headers | Record<string, unknown> | Map<string, unknown>): Promise<Address> {
+  async payToFor(source: PayToSource): Promise<Address> {
     return (await this.resolve(source)).address;
   }
 
   /** Full PayTo (address + why) for a request. Never throws. */
-  async resolve(
-    source: string | null | undefined | Headers | Record<string, unknown> | Map<string, unknown>,
-  ): Promise<PayTo> {
+  async resolve(source: PayToSource): Promise<PayTo> {
     const code =
       source == null || typeof source === "string" ? primaryCode(source ?? null) : this.codeFromHeaders(source);
 
@@ -549,8 +555,7 @@ export class Affiliation {
    *  to deployed the first time anyone claims it. Reading the cached value meant
    *  a long-lived process kept emitting a `deploy_split` leg for a split that
    *  already exists, and `createSplitDeterministic` at an existing address
-   *  reverts - taking an atomic deploy+distribute batch down with it. Python's
-   *  `distribute.distribute_plan` has always re-read this; now both ports agree. */
+   *  reverts - taking an atomic deploy+distribute batch down with it. */
   async release(code: string, opts?: { distributor?: Address }): Promise<{ calls: DistributeCall[]; balanceUnits: bigint }> {
     const pt = await this.resolve(code);
     if (!pt.plan.hasBuilder) return { calls: [], balanceUnits: 0n };
@@ -561,7 +566,7 @@ export class Affiliation {
   }
 
   /**
-   * The claims-dashboard payload — every per-builder split for this seller, ready
+   * The claims-dashboard payload - every per-builder split for this seller, ready
    * to serialize to JSON. One reusable call behind a `/splits` route. Each row
    * carries the split address, codes + share, live balance, deployed state, and a
    * permissionless [deploy?, distribute] claim. Discovery is by our app code `a`
@@ -636,12 +641,12 @@ export class Affiliation {
   /** code → registered payout address (null when unregistered). Rethrows on network error. */
   async payoutOf(code: string): Promise<Address | null> {
     try {
-      const addr = (await this.client.readContract({
+      const addr = await this.client.readContract({
         address: BUILDER_CODES_REGISTRY,
         abi: REGISTRY_ABI,
         functionName: "payoutAddress",
         args: [toTokenId(code)],
-      })) as Address;
+      });
       return BigInt(addr) === 0n ? null : addr;
     } catch (err) {
       if (isUnregistered(err)) return null;
@@ -651,23 +656,23 @@ export class Affiliation {
 
   /** The pair's counterfactual PushSplit address + whether it's deployed yet. */
   async predictSplitAddress(plan: SplitPlan): Promise<[Address, boolean]> {
-    const res = (await this.client.readContract({
+    const res = await this.client.readContract({
       address: SPLITS_PUSH_FACTORY,
       abi: FACTORY_ABI,
       functionName: "isDeployed",
       args: [splitStruct(plan), ZERO_ADDRESS, ZERO_SALT],
-    })) as readonly [Address, boolean];
+    });
     return [res[0], res[1]];
   }
 
   /** USDC balance sitting in the split right now (base units). */
   async splitBalance(splitAddress: Address): Promise<bigint> {
-    return (await this.client.readContract({
+    return await this.client.readContract({
       address: USDC_BASE,
       abi: ERC20_ABI,
       functionName: "balanceOf",
       args: [splitAddress],
-    })) as bigint;
+    });
   }
 }
 

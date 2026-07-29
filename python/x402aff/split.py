@@ -209,7 +209,7 @@ def resolve_and_plan(
     seller_payout: str,
     *,
     builder_share_bps: int = DEFAULT_BUILDER_SHARE_BPS,
-    rpc_url: str = resolver.DEFAULT_RPC,
+    rpc_url: str = resolver.BASE_RPC,
 ) -> SplitPlan:
     """Resolve the referer code ``s`` → payout via the Base registry, then plan.
 
@@ -229,7 +229,11 @@ def resolve_and_plan(
 
 
 def primary_code(s_code: Optional[str]) -> Optional[str]:
-    """First valid code from a possibly comma-joined ``s`` (v1 pays one builder)."""
+    """First non-empty code from a possibly comma-joined ``s`` (v1 pays one builder).
+
+    No format check here - a malformed code fails later in ``resolver.to_token_id``
+    and falls back to the seller. The TS port screens with the code grammar instead.
+    """
     if not s_code:
         return None
     for part in str(s_code).split(","):
