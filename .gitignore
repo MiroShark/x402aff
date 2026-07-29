@@ -9,8 +9,6 @@ venv/
 build/
 dist/
 
-# Local SQLite store created by tracking.py / demo.py
-affiliation.db
 *.db
 
 # Foundry (fork-test/) - deps + build artifacts. Run `forge install` to set up.

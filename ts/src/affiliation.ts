@@ -73,7 +73,7 @@ export const AFFILIATION_MARKER = "x402aff";
 
 /**
  * The buyer-side `s` codes to attach: your real builder `code`, plus the kit
- * marker as a second entry (the marker is dropped if invalid or equal to `code`).
+ * marker as a second entry (the marker is dropped when it would duplicate `code`).
  * Feed the result to whatever sets the payment's `s`, e.g.
  * `{ "builder-code": { info: { s: markedServiceCodes("bc_you") } } }`. The split
  * still pays the primary code (`code`), so the marker never changes a payout.
@@ -555,8 +555,7 @@ export class Affiliation {
    *  to deployed the first time anyone claims it. Reading the cached value meant
    *  a long-lived process kept emitting a `deploy_split` leg for a split that
    *  already exists, and `createSplitDeterministic` at an existing address
-   *  reverts - taking an atomic deploy+distribute batch down with it. Python's
-   *  `distribute.distribute_plan` has always re-read this; now both ports agree. */
+   *  reverts - taking an atomic deploy+distribute batch down with it. */
   async release(code: string, opts?: { distributor?: Address }): Promise<{ calls: DistributeCall[]; balanceUnits: bigint }> {
     const pt = await this.resolve(code);
     if (!pt.plan.hasBuilder) return { calls: [], balanceUnits: 0n };
@@ -567,7 +566,7 @@ export class Affiliation {
   }
 
   /**
-   * The claims-dashboard payload — every per-builder split for this seller, ready
+   * The claims-dashboard payload - every per-builder split for this seller, ready
    * to serialize to JSON. One reusable call behind a `/splits` route. Each row
    * carries the split address, codes + share, live balance, deployed state, and a
    * permissionless [deploy?, distribute] claim. Discovery is by our app code `a`

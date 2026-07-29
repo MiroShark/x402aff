@@ -38,8 +38,7 @@ class SplitStatus:
     split_address: Optional[str]
     deployed: bool
     balance_units: int
-    #: The share this split was predicted at. Trails the positional fields so
-    #: existing constructor calls keep working; needed because "is this worth
+    #: The share this split was predicted at. Needed because "is this worth
     #: distributing" depends on the allocation vector, not just the balance.
     builder_share_bps: int = SHARE_BPS
 
@@ -52,9 +51,9 @@ class SplitStatus:
     def needs_distribution(self) -> bool:
         """Whether a distribute would actually pay someone.
 
-        Was ``distributable_units > 0``, which is true forever: a settled two-way
-        split floors at a permanent 2 units, so every scan re-reported it as
-        pending and a keeper looping on this burned gas moving nothing.
+        Not ``distributable_units > 0`` - that is true forever: a settled two-way
+        split floors at a permanent 2 units, so a scan gating on it re-reports the
+        split as pending and a keeper looping on it burns gas moving nothing.
         """
         if self.builder_payout is None:
             return False

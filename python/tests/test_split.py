@@ -22,7 +22,7 @@ def test_plan_splits_90_10_by_default():
     assert dict(plan.recipients) == {BUILDER: 1000, SELLER: 9000}
     # Not 0.10/0.90: a PushSplit retains 1 base unit and floors each share, so
     # $1.00 pays out 99999/899999 units. Verified on a Base fork - see
-    # fork-test/EndToEnd.t.sol.
+    # fork-test/test/CdpPath.t.sol.
     assert plan.amounts_units(1.00) == {BUILDER: 99_999, SELLER: 899_999}
     assert plan.dust_units(1.00) == 2
     amounts = plan.amounts(1.00)

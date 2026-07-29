@@ -57,7 +57,7 @@ If you change the plan (share, addresses), regenerate the constants:
 
 ```bash
 python3 -c "
-import split, push_split
+from x402aff import split, push_split
 plan = split.build_split_plan(
     seller_payout='0x2222222222222222222222222222222222222222',
     builder_payout='0x1111111111111111111111111111111111111111',

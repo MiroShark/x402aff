@@ -111,7 +111,7 @@ class Affiliation:
 
         Pass as ``PaymentOption(pay_to=aff.pay_to)``. Reads ``X-Builder-Code`` off
         the request context and returns the per-pair split address, or the seller
-        wallet when there's no/unknown/​unresolvable code.
+        wallet when there's no/unknown/unresolvable code.
         """
         return self.resolve(ctx).address
 
@@ -220,14 +220,14 @@ class Affiliation:
         return monitor.SplitStatus(code, payout, addr, deployed, bal, self._share)
 
     def splits_payload(self, *, days: int = 90) -> dict:
-        """The claims-dashboard payload — every per-builder split for this seller,
+        """The claims-dashboard payload - every per-builder split for this seller,
         ready to serialize to JSON. One reusable call behind a ``/splits`` route.
 
         Each row carries the split address, its codes + share, live balance,
         deployed state, and a permissionless ``[deploy?, distribute]`` claim.
         Discovery is by our app code ``a`` (CDP); the claim is reconstructed from
         the seller wallet THIS facade holds, so even undeployed splits build with
-        no guessing. The shared marker and any unregistered/​unresolvable builder
+        no guessing. The shared marker and any unregistered/unresolvable builder
         code are skipped.
 
         No per-split payment count: the query that would produce one 400s on

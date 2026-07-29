@@ -145,9 +145,12 @@ FROM base.transaction_attributions
 WHERE builder_code = 'x402aff' AND action = 1;
 ```
 
-Join those tx hashes to the USDC `Transfer` in `base.events` (bounded by their
-`block_number`, so the scan stays tiny) to recover each payment's `payTo` (the
-split), then read its balance as usual - see `queries.sql` #5. The marker needs no
+Do **not** try to recover each payment's `payTo` by joining those tx hashes to the
+USDC `Transfer` in `base.events`: the planner does not push a `block_number` bound
+down, so the scan trips the CDP SQL API's leaf-scan limit and 400s (measured, see
+`queries.sql` #5b). For a per-builder payment count use the attributions-only
+`queries.sql` #5c; for balances, predict each pair's split address and read it
+on-chain the way `Affiliation.splits_payload` does. The marker needs no
 registration - it is stamped into the settlement suffix and indexed even as an
 unregistered code, and as a shared label it is not exclusive. Because `s` is
 buyer-attached, the marker tags
