@@ -91,6 +91,38 @@ def test_primary_code_picks_first_valid():
     assert split.primary_code(None) is None
 
 
+# The same table is asserted in ts/test/affiliation.test.ts. The two ports must
+# agree on which code gets paid; they did not, and the raw-string path routed a
+# payment to a different party in each.
+PRIMARY_CODE_PARITY = [
+    ("bc_alice,bc_bob", "bc_alice"),
+    ("BAD CODE,good_code", "good_code"),   # skip the malformed entry, do not select it
+    ("BAD!,bc_bob", "bc_bob"),
+    ("  ,bc_alice", "bc_alice"),
+    ("bc_x\n", "bc_x"),                    # trailing whitespace is trimmed, not rejected
+    ("UPPER", None),                       # uppercase is not a valid code
+    ("!!!", None),
+    ("", None),
+]
+
+
+@pytest.mark.parametrize("raw,expected", PRIMARY_CODE_PARITY)
+def test_primary_code_matches_the_ts_port(raw, expected):
+    assert split.primary_code(raw) == expected
+
+
+def test_a_malformed_entry_no_longer_costs_the_builder_their_cut(monkeypatch):
+    """One bad entry ahead of a real code used to route the whole payment to the
+    seller. A layered client can put anything in `s`."""
+    monkeypatch.setattr(split.resolver, "resolve",
+                        lambda code, **kw: {"registered": code == "bc_bob",
+                                            "payout_address": BUILDER})
+    plan = split.resolve_and_plan("BAD CODE,bc_bob", SELLER)
+    assert plan.has_builder
+    assert plan.builder_code == "bc_bob"
+    assert dict(plan.recipients) == {BUILDER: 1000, SELLER: 9000}
+
+
 def test_resolve_and_plan_uses_registry(monkeypatch):
     # Stub the on-chain resolve so the test stays offline.
     monkeypatch.setattr(

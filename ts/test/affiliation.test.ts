@@ -118,6 +118,25 @@ test("primaryCode takes the first valid code from a comma-joined s", () => {
   assert.equal(primaryCode(null), null);
 });
 
+// The same table is asserted in python/tests/test_split.py. The two ports must
+// agree on which code gets paid; they did not, and the raw-string path routed a
+// payment to a different party in each.
+test("primaryCode matches the Python port", () => {
+  const parity: [string, string | null][] = [
+    ["bc_alice,bc_bob", "bc_alice"],
+    ["BAD CODE,good_code", "good_code"], // skip the malformed entry, do not select it
+    ["BAD!,bc_bob", "bc_bob"],
+    ["  ,bc_alice", "bc_alice"],
+    ["bc_x\n", "bc_x"],                  // trailing whitespace is trimmed, not rejected
+    ["UPPER", null],                     // uppercase is not a valid code
+    ["!!!", null],
+    ["", null],
+  ];
+  for (const [raw, expected] of parity) {
+    assert.equal(primaryCode(raw), expected, `primaryCode(${JSON.stringify(raw)})`);
+  }
+});
+
 test("isDeployed calldata matches cast byte-for-byte (same address as Python)", () => {
   assert.equal(isDeployedCalldata(plan()), CAST_IS_DEPLOYED);
 });
