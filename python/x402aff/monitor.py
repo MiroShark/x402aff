@@ -26,7 +26,7 @@ from . import cdp_sql, distribute, push_split, resolver, split
 
 APP_CODE = os.environ.get("X402_BUILDER_CODE", "")
 SELLER_PAYOUT = os.environ.get("X402_SELLER_PAYOUT", "")
-SHARE_BPS = int(os.environ.get("X402_BUILDER_SHARE_BPS", str(split.DEFAULT_BUILDER_SHARE_BPS)))
+SHARE_BPS = push_split.BUILDER_SHARE_BPS
 # Facilitator wallet codes are never the referer; skip anything that looks like one.
 _FACIL_PREFIX = "cdp_facil"
 

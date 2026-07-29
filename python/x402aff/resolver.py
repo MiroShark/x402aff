@@ -32,6 +32,8 @@ import re
 
 import requests
 
+from .builder_code import BUILDER_CODE_PATTERN
+
 # Canonical Base-mainnet registry (the ERC1967 proxy). Same address is the
 # authoritative source for every builder code.
 BUILDER_CODES_REGISTRY = "0x000000BC7E6457e610fe52Dcc0ca5b3ce59C8E80"
@@ -42,7 +44,7 @@ DEFAULT_RPC = "https://mainnet.base.org"
 _SEL_OWNER_OF = "6352211e"        # ownerOf(uint256)          - standard ERC-721
 _SEL_PAYOUT_BY_ID = "9b2c1793"    # payoutAddress(uint256)
 
-_CODE_RE = re.compile(r"^[a-z0-9_]{1,32}$")
+_CODE_RE = re.compile(BUILDER_CODE_PATTERN)
 
 
 def to_token_id(code: str) -> int:

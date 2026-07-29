@@ -43,8 +43,6 @@ def _aff(**kw) -> Affiliation:
 # ── construction ──────────────────────────────────────────────────────────────
 
 def test_requires_app_code_and_seller():
-    import pytest
-
     with pytest.raises(ValueError):
         Affiliation(app_code="", seller_payout=SELLER)
     with pytest.raises(ValueError):
