@@ -642,12 +642,12 @@ export class Affiliation {
   /** code → registered payout address (null when unregistered). Rethrows on network error. */
   async payoutOf(code: string): Promise<Address | null> {
     try {
-      const addr = (await this.client.readContract({
+      const addr = await this.client.readContract({
         address: BUILDER_CODES_REGISTRY,
         abi: REGISTRY_ABI,
         functionName: "payoutAddress",
         args: [toTokenId(code)],
-      })) as Address;
+      });
       return BigInt(addr) === 0n ? null : addr;
     } catch (err) {
       if (isUnregistered(err)) return null;
@@ -657,23 +657,23 @@ export class Affiliation {
 
   /** The pair's counterfactual PushSplit address + whether it's deployed yet. */
   async predictSplitAddress(plan: SplitPlan): Promise<[Address, boolean]> {
-    const res = (await this.client.readContract({
+    const res = await this.client.readContract({
       address: SPLITS_PUSH_FACTORY,
       abi: FACTORY_ABI,
       functionName: "isDeployed",
       args: [splitStruct(plan), ZERO_ADDRESS, ZERO_SALT],
-    })) as readonly [Address, boolean];
+    });
     return [res[0], res[1]];
   }
 
   /** USDC balance sitting in the split right now (base units). */
   async splitBalance(splitAddress: Address): Promise<bigint> {
-    return (await this.client.readContract({
+    return await this.client.readContract({
       address: USDC_BASE,
       abi: ERC20_ABI,
       functionName: "balanceOf",
       args: [splitAddress],
-    })) as bigint;
+    });
   }
 }
 
