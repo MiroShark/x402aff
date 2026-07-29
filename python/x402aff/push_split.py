@@ -36,9 +36,16 @@ USDC_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 # 0xSplits PushSplitFactory V2.2 on Base - confirmed by the Splits team
 # (2026-07-15) and verified on-chain (Basescan: "PushSplitFactory", 0xSplits).
 # Canonical list: https://splits.org/protocol/docs/core/split-v2#addresses
-SPLITS_PUSH_FACTORY = os.environ.get(
-    "X402_SPLITS_PUSH_FACTORY", "0x8E8eB0cC6AE34A38B67D5Cf91ACa38f60bc3Ecf4"
-)
+#
+# Deliberately a constant, not configurable. The kit does not derive the split
+# address itself - it asks this contract via isDeployed() and advertises whatever
+# comes back as the route's payTo, so this address decides where every payment
+# lands. An override made that redirectable by anything that can set an env var
+# (a CI variable store, a leaked .env, `docker run -e`), which is a wider trust
+# boundary than the code itself, and a typo rerouted funds instead of failing.
+# Nothing used it: no doc, no workflow, no fork test, and the TS port has no
+# equivalent knob. Point `rpc_url` at a fork if you need to test against one.
+SPLITS_PUSH_FACTORY = "0x8E8eB0cC6AE34A38B67D5Cf91ACa38f60bc3Ecf4"
 # One env read, in resolver, so every leg of the money path agrees.
 BASE_RPC = resolver.BASE_RPC
 # Cut to the referer builder code, in basis points (1000 = 10%).

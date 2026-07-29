@@ -42,6 +42,23 @@ def test_factory_is_the_confirmed_base_address():
     assert push_split.SPLITS_PUSH_FACTORY == "0x8E8eB0cC6AE34A38B67D5Cf91ACa38f60bc3Ecf4"
 
 
+def test_factory_cannot_be_repointed_by_the_environment(monkeypatch):
+    """The factory's answer becomes the advertised payTo, so it stays a constant.
+
+    It used to read X402_SPLITS_PUSH_FACTORY, which let anything that could set an
+    env var choose where every payment landed.
+    """
+    import importlib
+
+    monkeypatch.setenv("X402_SPLITS_PUSH_FACTORY", "0x" + "ee" * 20)
+    reloaded = importlib.reload(push_split)
+    try:
+        assert reloaded.SPLITS_PUSH_FACTORY == "0x8E8eB0cC6AE34A38B67D5Cf91ACa38f60bc3Ecf4"
+    finally:
+        monkeypatch.delenv("X402_SPLITS_PUSH_FACTORY")
+        importlib.reload(push_split)
+
+
 def test_is_deployed_calldata_matches_cast_byte_for_byte():
     assert push_split.is_deployed_calldata(_plan()) == CAST_IS_DEPLOYED
 
