@@ -4,6 +4,7 @@
 [![npm](https://img.shields.io/npm/v/x402aff?logo=npm&logoColor=white&label=npm)](https://www.npmjs.com/package/x402aff)
 [![CI](https://github.com/MiroShark/x402aff/actions/workflows/ci.yml/badge.svg)](https://github.com/MiroShark/x402aff/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
+[![Dashboard](https://img.shields.io/badge/dashboard-miroshark.xyz%2Fx402aff-blue)](https://www.miroshark.xyz/x402aff)
 
 **Give the apps that send you paying users a cut - enforced on-chain, at
 settlement, with no facilitator of your own to run.**
