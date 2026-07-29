@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from . import resolver
+from .builder_code import normalize_builder_code
 
 # Default cut to the referer builder code. 1000 bps = 10% of the payment.
 DEFAULT_BUILDER_SHARE_BPS = 1000
@@ -229,15 +230,19 @@ def resolve_and_plan(
 
 
 def primary_code(s_code: Optional[str]) -> Optional[str]:
-    """First non-empty code from a possibly comma-joined ``s`` (v1 pays one builder).
+    """First **valid** code from a possibly comma-joined ``s`` (v1 pays one builder).
 
-    No format check here - a malformed code fails later in ``resolver.to_token_id``
-    and falls back to the seller. The TS port screens with the code grammar instead.
+    Malformed entries are skipped rather than selected. A layered client stack can
+    put anything in ``s``, and taking the first non-empty entry meant one bad one
+    ahead of the real code cost that builder their whole cut - the split fell back
+    to the seller. Skipping is also what the rest of the kit already does: the
+    header path runs ``normalize_service_codes`` first, which drops invalid entries
+    before this ever sees them, and the TS ``primaryCode`` screens the same way.
     """
     if not s_code:
         return None
     for part in str(s_code).split(","):
-        part = part.strip()
-        if part:
-            return part
+        code = normalize_builder_code(part)
+        if code:
+            return code
     return None
