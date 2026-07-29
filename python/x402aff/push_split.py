@@ -39,7 +39,8 @@ USDC_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 SPLITS_PUSH_FACTORY = os.environ.get(
     "X402_SPLITS_PUSH_FACTORY", "0x8E8eB0cC6AE34A38B67D5Cf91ACa38f60bc3Ecf4"
 )
-BASE_RPC = os.environ.get("X402_BASE_RPC", resolver.DEFAULT_RPC)
+# One env read, in resolver, so every leg of the money path agrees.
+BASE_RPC = resolver.BASE_RPC
 # Cut to the referer builder code, in basis points (1000 = 10%).
 BUILDER_SHARE_BPS = int(
     os.environ.get("X402_BUILDER_SHARE_BPS", str(split.DEFAULT_BUILDER_SHARE_BPS))

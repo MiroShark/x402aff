@@ -28,6 +28,7 @@ Verified live: leap_wallet → owner 0xf9d7…8116, payout 0xa06c…54c8.
 """
 from __future__ import annotations
 
+import os
 import re
 
 import requests
@@ -37,7 +38,16 @@ from .builder_code import BUILDER_CODE_PATTERN
 # Canonical Base-mainnet registry (the ERC1967 proxy). Same address is the
 # authoritative source for every builder code.
 BUILDER_CODES_REGISTRY = "0x000000BC7E6457e610fe52Dcc0ca5b3ce59C8E80"
+# The public Base endpoint. Rate-limits after a few calls in a row.
 DEFAULT_RPC = "https://mainnet.base.org"
+
+# The RPC every kit path falls back to when the caller passes none. Resolved
+# here, in the leaf module, because `split` cannot import `push_split` (that
+# would cycle) - so this is the only place all four entry points can share. The
+# registry-resolve leg used to default to DEFAULT_RPC directly and so ignored
+# X402_BASE_RPC entirely: a seller who set a paid RPC still hit the public one
+# for the lookup whose failure silently costs the builder their cut.
+BASE_RPC = os.environ.get("X402_BASE_RPC", DEFAULT_RPC)
 
 # 4-byte function selectors (keccak256(sig)[:4]). Hardcoded so this file needs no
 # keccak library; each is verified against the on-chain contract.
@@ -65,9 +75,33 @@ def to_code(token_id: int) -> str:
     return token_id.to_bytes(length, "big").decode("ascii")
 
 
+# EIP-1474: an eth_call that ran and reverted. Distinct from the -32000/-32005/
+# -32603 family a node returns when it never executed the call at all.
+_REVERT_ERROR_CODE = 3
+
+
+def _is_revert(error: dict) -> bool:
+    """Did the call execute and revert (code unregistered), or did the node fail?
+
+    Only a revert means "no such code". Nodes disagree on how they say it - some
+    use the EIP-1474 code, others only put it in the message - so check both.
+    """
+    if error.get("code") == _REVERT_ERROR_CODE:
+        return True
+    return "revert" in str(error.get("message", "")).lower()
+
+
 def _eth_call(selector: str, token_id: int, rpc_url: str, timeout: float) -> str | None:
-    """Call a `(uint256)` view on the registry; return the 32-byte hex word, or
-    None if the call reverted (e.g. the code isn't registered)."""
+    """Call a `(uint256)` view on the registry; return the 32-byte hex word.
+
+    Returns None only when the call *reverted* - i.e. the code is not registered.
+    A transport or node failure raises instead, and must: collapsing an RPC 429
+    into "unregistered" routes the payment to the seller unsplit while leaving
+    ``PayTo.error`` unset, so nothing logs and the builder loses their cut in
+    silence - exactly the signal ``payto.PayTo.error`` exists to catch. The 402
+    still never breaks: ``payto.payto_for_request`` catches this and falls back
+    to the seller, but records the error. Mirrors the TS port's isUnregistered.
+    """
     data = "0x" + selector + f"{token_id:064x}"
     resp = requests.post(
         rpc_url,
@@ -77,9 +111,14 @@ def _eth_call(selector: str, token_id: int, rpc_url: str, timeout: float) -> str
     )
     resp.raise_for_status()
     body = resp.json()
+    error = body.get("error")
+    if error:
+        if _is_revert(error):
+            return None
+        raise RuntimeError(f"registry eth_call failed: {error}")
     result = body.get("result")
-    # A revert (unregistered token) comes back as an error, or occasionally "0x".
-    if body.get("error") or not result or result == "0x":
+    # Some nodes answer a reverting view with an empty result instead of an error.
+    if not result or result == "0x":
         return None
     return result
 
@@ -93,7 +132,7 @@ def _word_to_address(word: str | None) -> str | None:
     return None if int(addr, 16) == 0 else addr
 
 
-def resolve(code: str, *, rpc_url: str = DEFAULT_RPC, timeout: float = 20.0) -> dict:
+def resolve(code: str, *, rpc_url: str = BASE_RPC, timeout: float = 20.0) -> dict:
     """Resolve a builder code to its owner + payout address on Base.
 
     Returns::
@@ -116,7 +155,7 @@ def resolve(code: str, *, rpc_url: str = DEFAULT_RPC, timeout: float = 20.0) -> 
             "owner": owner, "payout_address": payout}
 
 
-def resolve_many(codes, *, rpc_url: str = DEFAULT_RPC) -> dict[str, dict]:
+def resolve_many(codes, *, rpc_url: str = BASE_RPC) -> dict[str, dict]:
     """Resolve several codes → {code: resolve(code)}. (Sequential; the registry
     has no batch getter - wrap in a multicall if you need one round-trip.)"""
     return {c: resolve(c, rpc_url=rpc_url) for c in dict.fromkeys(codes)}

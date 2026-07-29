@@ -209,7 +209,7 @@ def resolve_and_plan(
     seller_payout: str,
     *,
     builder_share_bps: int = DEFAULT_BUILDER_SHARE_BPS,
-    rpc_url: str = resolver.DEFAULT_RPC,
+    rpc_url: str = resolver.BASE_RPC,
 ) -> SplitPlan:
     """Resolve the referer code ``s`` → payout via the Base registry, then plan.
 
