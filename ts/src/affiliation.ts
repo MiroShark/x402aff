@@ -158,13 +158,21 @@ const ERC20_ABI = [
 ] as const;
 
 // ── plain-data types ─────────────────────────────────────────────────────────
+
+/** One `[address, allocationBps]` leg of a split. Hand-build these for a
+ *  multi-recipient plan (see the README). */
+export type Recipient = [Address, number];
+
+/** What `resolve`/`payToFor` accept: a raw code, or anything header-shaped. */
+export type PayToSource = string | null | undefined | Headers | Record<string, unknown> | Map<string, unknown>;
+
 export interface SplitPlan {
   sellerPayout: Address;
   builderCode: string | null;
   builderPayout: Address | null;
   builderShareBps: number;
   /** `[address, allocationBps][]`, summing to BPS_DENOM - the PushSplit's shape. */
-  recipients: Array<[Address, number]>;
+  recipients: Recipient[];
   hasBuilder: boolean;
 }
 
@@ -395,7 +403,7 @@ export interface SplitRow {
   distributableUnits: string;
   deployed: boolean;
   claimable: boolean;
-  calls: { step: DistributeCall["step"]; target: Address; data: Hex }[];
+  calls: Omit<DistributeCall, "summary">[];
 }
 
 export interface SplitsPayload {
@@ -474,14 +482,12 @@ export class Affiliation {
   }
 
   /** The `payTo` address for a request - the split, or the seller wallet. Never throws. */
-  async payToFor(source: string | null | undefined | Headers | Record<string, unknown> | Map<string, unknown>): Promise<Address> {
+  async payToFor(source: PayToSource): Promise<Address> {
     return (await this.resolve(source)).address;
   }
 
   /** Full PayTo (address + why) for a request. Never throws. */
-  async resolve(
-    source: string | null | undefined | Headers | Record<string, unknown> | Map<string, unknown>,
-  ): Promise<PayTo> {
+  async resolve(source: PayToSource): Promise<PayTo> {
     const code =
       source == null || typeof source === "string" ? primaryCode(source ?? null) : this.codeFromHeaders(source);
 
