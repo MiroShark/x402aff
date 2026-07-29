@@ -41,7 +41,6 @@ DEFAULT_RPC = "https://mainnet.base.org"
 # keccak library; each is verified against the on-chain contract.
 _SEL_OWNER_OF = "6352211e"        # ownerOf(uint256)          - standard ERC-721
 _SEL_PAYOUT_BY_ID = "9b2c1793"    # payoutAddress(uint256)
-_SEL_OWNER_OF_STR = None          # (use the uint256 overloads - no string ABI encoding needed)
 
 _CODE_RE = re.compile(r"^[a-z0-9_]{1,32}$")
 
