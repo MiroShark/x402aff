@@ -16,8 +16,10 @@ name: Release
 #           `owner`/`repo` there are GitHub coordinates, unrelated to who owns
 #           the project on PyPI. Once it exists, drop the `password:` line below
 #           and delete the secret - `id-token: write` already covers OIDC.
-#   npm   - repo secret `NPM_TOKEN` (an automation token). Provenance is on via
-#           publishConfig, which needs this workflow's `id-token: write`.
+#   npm   - OIDC trusted publishing, no token. Configured on npmjs.com (package
+#           Settings -> Trusted Publisher) for owner `MiroShark`, repo `x402aff`,
+#           workflow `release.yml` (must match this file's name), environment
+#           blank. Provenance is on via publishConfig + `id-token: write`.
 
 on:
   push:
