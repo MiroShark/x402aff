@@ -117,8 +117,7 @@ jobs:
         working-directory: ts
       - run: npm run build
         working-directory: ts
+      # Auth via OIDC trusted publishing (configured on npmjs.com) — no token
       - run: npm publish
         if: steps.version.outputs.published == 'false'
         working-directory: ts
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
