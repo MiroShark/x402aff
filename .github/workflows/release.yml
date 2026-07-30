@@ -7,15 +7,12 @@ name: Release
 #
 # One-time setup, per registry:
 #
-#   PyPI  - currently the repo secret `PYPI_API_TOKEN` (account-scoped, owner
-#           `aaronjmars`). Trusted publishing is better and needs no secret: on
-#           https://pypi.org/manage/account/publishing/, signed in as the account
-#           that should own the project (a personal one is fine - no PyPI org
-#           needed), add a publisher for project `x402aff`, owner `MiroShark`,
-#           repo `x402aff`, workflow `release.yml`, environment `pypi`. The
-#           `owner`/`repo` there are GitHub coordinates, unrelated to who owns
-#           the project on PyPI. Once it exists, drop the `password:` line below
-#           and delete the secret - `id-token: write` already covers OIDC.
+#   PyPI  - OIDC trusted publishing, no token. Configured on
+#           https://pypi.org/manage/account/publishing/ with a publisher for
+#           project `x402aff`, owner `MiroShark`, repo `x402aff`, workflow
+#           `release.yml`, environment `pypi`. The `owner`/`repo` there are GitHub
+#           coordinates, unrelated to who owns the project on PyPI. `id-token:
+#           write` + the `pypi` environment on this job cover the OIDC exchange.
 #   npm   - OIDC trusted publishing, no token. Configured on npmjs.com (package
 #           Settings -> Trusted Publisher) for owner `MiroShark`, repo `x402aff`,
 #           workflow `release.yml` (must match this file's name), environment
@@ -75,7 +72,6 @@ jobs:
         if: steps.version.outputs.published == 'false'
         with:
           packages-dir: python/dist
-          password: ${{ secrets.PYPI_API_TOKEN }}
 
   npm:
     if: ${{ github.event_name == 'push' || inputs.target == 'both' || inputs.target == 'npm' }}
