@@ -1,8 +1,4 @@
 <p align="center">
-  <b>Give the apps that send you paying users a cut - enforced on-chain, at settlement, with no facilitator of your own to run.</b>
-</p>
-
-<p align="center">
   <img src="docs/images/hero-animated.svg" alt="x402aff — Split every payment. 10% builder cut, one line client-side, zero contracts to run. The money path flows request → settle → split → payout. Builder-code affiliation for x402 sellers: give the apps that send you paying users a cut, enforced on-chain at settlement via an ownerless, immutable 0xSplits contract. Keywords: x402, Base builder codes, 0xSplits, affiliate, revenue share, USDC, CDP facilitator." width="100%" />
 </p>
 
@@ -35,6 +31,8 @@
 </div>
 
 ---
+
+<b>Give the apps that send you paying users a cut - enforced on-chain, at settlement, with no facilitator of your own to run.</b>
 
 If you sell an API behind an [x402](https://x402.org) paywall, this splits each
 payment so the builder whose app drove it earns a share (default **10%**). The cut
