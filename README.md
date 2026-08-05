@@ -1,10 +1,34 @@
-# X402aff - Builder-code affiliation for x402 sellers
+<p align="center">
+  <img src="docs/images/hero-animated.svg" alt="x402aff — Split every payment. 10% builder cut, one line client-side, zero contracts to run. The money path flows request → settle → split → payout. Builder-code affiliation for x402 sellers: give the apps that send you paying users a cut, enforced on-chain at settlement via an ownerless, immutable 0xSplits contract. Keywords: x402, Base builder codes, 0xSplits, affiliate, revenue share, USDC, CDP facilitator." width="100%" />
+</p>
+
+<h1 align="center">Split every <em>payment.</em></h1>
+
+<p align="center">
+  <strong>Get it&nbsp;→</strong>&nbsp;&nbsp;
+  <a href="https://github.com/MiroShark/x402aff/stargazers"><img src="docs/images/btn-star.svg" alt="Star x402aff on GitHub" height="34" align="absmiddle"></a>&nbsp;&nbsp;
+  <a href="https://pypi.org/project/x402aff/"><img src="docs/images/btn-pypi.svg" alt="x402aff on PyPI" height="34" align="absmiddle"></a>&nbsp;&nbsp;
+  <a href="https://www.npmjs.com/package/x402aff"><img src="docs/images/btn-npm.svg" alt="x402aff on npm" height="34" align="absmiddle"></a>&nbsp;&nbsp;
+  <a href="https://www.miroshark.xyz/x402aff"><img src="docs/images/btn-dashboard.svg" alt="Live claims dashboard at miroshark.xyz/x402aff" height="34" align="absmiddle"></a>&nbsp;&nbsp;
+  <a href="./docs/INTEGRATION.md"><img src="docs/images/btn-docs.svg" alt="Integration docs" height="34" align="absmiddle"></a>
+</p>
+
+<p align="center">
+  <b>10%</b> · builder cut &nbsp;·&nbsp; <b>1 line</b> · client side &nbsp;·&nbsp; <b>0</b> · contracts to run
+</p>
+<p align="center">
+  <b>On-chain</b> · at settlement &nbsp;·&nbsp; <b>Ownerless</b> · immutable 0xSplits &nbsp;·&nbsp; <b>Base mainnet</b> · proven
+</p>
+
+<div align="center">
 
 [![PyPI](https://img.shields.io/pypi/v/x402aff?logo=pypi&logoColor=white&label=pypi)](https://pypi.org/project/x402aff/)
 [![npm](https://img.shields.io/npm/v/x402aff?logo=npm&logoColor=white&label=npm)](https://www.npmjs.com/package/x402aff)
 [![CI](https://github.com/MiroShark/x402aff/actions/workflows/ci.yml/badge.svg)](https://github.com/MiroShark/x402aff/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 [![Dashboard](https://img.shields.io/badge/dashboard-miroshark.xyz%2Fx402aff-blue)](https://www.miroshark.xyz/x402aff)
+
+</div>
 
 **Give the apps that send you paying users a cut - enforced on-chain, at
 settlement, with no facilitator of your own to run.**
