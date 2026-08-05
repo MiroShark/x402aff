@@ -34,6 +34,8 @@
 
 </div>
 
+---
+
 If you sell an API behind an [x402](https://x402.org) paywall, this splits each
 payment so the builder whose app drove it earns a share (default **10%**). The cut
 lands in an ownerless, immutable [0xSplits](https://splits.org) contract at
