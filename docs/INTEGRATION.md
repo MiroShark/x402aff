@@ -165,6 +165,14 @@ level: the registered owner is paid regardless of who drove the traffic, and the
 **split ratio is enforced by an immutable contract** - that's the guarantee that
 matters. What it is *not* is a trustless proof of who drove a payment.
 
+A concrete consequence, accepted by design: a buyer can register their own code
+and always send it, routing the builder share of *their own* payments back to
+themselves - an effective self-rebate of that share (10% by default). It is
+bounded to the builder cut and can never touch your principal (you always net the
+remainder), so this is an open affiliate network by choice, not a fraud vector.
+Sellers who need curated affiliates should gate `payTo` on their own allowlist of
+trusted codes before this resolver ever sees the request.
+
 The split is enforced; the *routing to it* is a client opt-in (the header). A
 generic x402 client that only sets `s` and never sends the header pays you
 directly, unsplit - which is safe (you keep 100%) but unattributed on-chain in

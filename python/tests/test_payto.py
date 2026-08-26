@@ -109,9 +109,30 @@ def test_failure_is_not_cached(monkeypatch):
     assert r.attributed and r.split_deployed
 
 
-def test_unregistered_is_not_cached(monkeypatch):
-    # First lookup resolves fine but the code isn't registered yet → seller.
-    # (predict is _boom to prove we never predict an address for an empty plan.)
+def test_unregistered_repeat_is_served_from_negative_cache(monkeypatch):
+    # A repeated unregistered code must not re-hit the registry every request -
+    # that flood is the cost-amplification vector. (predict is _boom to prove we
+    # never predict an address for an empty plan.)
+    calls = {"n": 0}
+
+    def counting_unregistered(*a, **k):
+        calls["n"] += 1
+        return split.build_split_plan(SELLER, None, builder_code="bc_late")
+
+    monkeypatch.setattr(split, "resolve_and_plan", counting_unregistered)
+    monkeypatch.setattr(push_split, "predict_split_address", _boom)
+    first = payto.payto_for_request("bc_late", seller_payout=SELLER)
+    second = payto.payto_for_request("bc_late", seller_payout=SELLER)
+    assert first.address == SELLER and not first.attributed
+    assert second.address == SELLER and not second.attributed
+    assert calls["n"] == 1, "second request should be served from the negative cache"
+
+
+def test_unregistered_negative_cache_expires_and_picks_up_registration(monkeypatch):
+    # The negative cache is short-lived: after the TTL the miss is re-checked, so a
+    # builder who registers later is picked up (bounded by the TTL, not stranded).
+    clock = {"t": 1000.0}
+    monkeypatch.setattr(payto.time, "monotonic", lambda: clock["t"])
     monkeypatch.setattr(
         split, "resolve_and_plan",
         lambda *a, **k: split.build_split_plan(SELLER, None, builder_code="bc_late"),
@@ -119,8 +140,9 @@ def test_unregistered_is_not_cached(monkeypatch):
     monkeypatch.setattr(push_split, "predict_split_address", _boom)
     first = payto.payto_for_request("bc_late", seller_payout=SELLER)
     assert first.address == SELLER and not first.attributed
-    # The builder registers later; the next request must pick up the split, not a
-    # stale cached miss (which would silently strand their cut for the process life).
+
+    # TTL elapses; the builder has since registered.
+    clock["t"] += payto.NEG_CACHE_TTL_S + 1
     monkeypatch.setattr(split, "resolve_and_plan", _plan_with_builder)
     monkeypatch.setattr(push_split, "predict_split_address", lambda plan, **k: (SPLIT, False))
     second = payto.payto_for_request("bc_late", seller_payout=SELLER)

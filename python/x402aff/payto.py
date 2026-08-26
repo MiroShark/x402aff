@@ -34,6 +34,7 @@ never a failed one.
 from __future__ import annotations
 
 import os
+import time
 from dataclasses import dataclass
 from typing import Optional
 
@@ -63,12 +64,49 @@ class PayTo:
 
 
 #: (code, seller, share_bps) → PayTo. Only *positive* (attributed) resolutions
-#: are cached: a pair's split address is deterministic (CREATE2, salt=0) and a
-#: registered payout effectively never changes, so it's safe to hold for the
-#: process lifetime. An unregistered code (or a lookup error) is never cached, so
-#: a builder who registers after their first request isn't stranded on a stale
-#: miss. Keeps the 402 path to zero RPC round-trips once a builder is resolved.
+#: are cached here: a pair's split address is deterministic (CREATE2, salt=0) and
+#: a registered payout effectively never changes, so it's safe to hold for the
+#: process lifetime. An unregistered code goes in the short-TTL negative cache
+#: below instead (a lookup error is not cached at all); keeps the 402 path to
+#: zero RPC round-trips once a builder is resolved.
 _CACHE: dict[tuple[str, str, int], PayTo] = {}
+
+#: (code, seller, share_bps) → monotonic expiry, for UNREGISTERED codes only (a
+#: clean "not registered" answer from the registry). A repeated bogus code would
+#: otherwise re-hit the registry on every unpaid request - one RPC call each, no
+#: rate limit - which trips the public RPC's 429s and makes legitimate builders
+#: silently lose their cut. This bounds the *repeated-code* case; a flood of
+#: *distinct* bogus codes still costs one read each (every key is new) and is
+#: left to the paid-RPC recommendation (its own limits) plus fail-open. A lookup
+#: ERROR is deliberately NOT cached, so a real builder hit by a transient blip
+#: retries next request instead of being stranded for the TTL. The TTL is short
+#: so a builder who registers just after their first request is stranded for at
+#: most that window; the cap keeps the cache itself from being an amp vector.
+_NEG_CACHE: dict[tuple[str, str, int], float] = {}
+NEG_CACHE_TTL_S = 60.0
+NEG_CACHE_MAX = 1024
+
+
+def _neg_hit(key: tuple[str, str, int]) -> bool:
+    """True if `key` has a live negative entry (expired entries swept lazily)."""
+    exp = _NEG_CACHE.get(key)
+    if exp is None:
+        return False
+    if exp <= time.monotonic():
+        _NEG_CACHE.pop(key, None)
+        return False
+    return True
+
+
+def _neg_set(key: tuple[str, str, int]) -> None:
+    """Record a short-TTL miss, evicting the oldest when full. Refresh moves the
+    key to the end (dicts keep insertion order), so eviction drops the oldest."""
+    _NEG_CACHE.pop(key, None)
+    if len(_NEG_CACHE) >= NEG_CACHE_MAX:
+        oldest = next(iter(_NEG_CACHE), None)
+        if oldest is not None:
+            _NEG_CACHE.pop(oldest, None)
+    _NEG_CACHE[key] = time.monotonic() + NEG_CACHE_TTL_S
 
 
 def builder_code_from_headers(headers) -> Optional[str]:
@@ -124,6 +162,12 @@ def payto_for_request(
     key = (code, seller, share)
     if use_cache and key in _CACHE:
         return _CACHE[key]
+    if use_cache and _neg_hit(key):
+        # A recent UNREGISTERED miss short-circuits without another registry read,
+        # so a repeated bogus code can't re-hit the RPC on every request.
+        return PayTo(
+            seller, split.build_split_plan(seller, None, builder_code=code), False, False
+        )
 
     try:
         plan = split.resolve_and_plan(
@@ -133,21 +177,24 @@ def payto_for_request(
             rpc_url=rpc_url or resolver.BASE_RPC,
         )
         if not plan.has_builder:
-            # Resolved fine, but this code isn't registered *yet*. Deliberately
-            # NOT cached: the builder may register later, and a cached miss would
-            # strand their cut (route to the seller, unsplit) for the whole
-            # process life - and a valid-format unknown code could even be used to
-            # prime it. Only positive resolutions are memoized (see below).
+            # Resolved fine, but this code isn't registered *yet*. Held only in the
+            # short-TTL negative cache (not `_CACHE`): the builder may register
+            # later, and a lasting miss would strand their cut for the whole
+            # process life. Only positive resolutions are memoized permanently.
+            if use_cache:
+                _neg_set(key)
             return PayTo(seller, plan, False, False)
 
         address, deployed = push_split.predict_split_address(plan, rpc_url=rpc_url)
         result = PayTo(address, plan, deployed, True)
         if use_cache:
+            _NEG_CACHE.pop(key, None)  # a code that now resolves is no longer a miss
             _CACHE[key] = result
         return result
     except Exception as exc:  # noqa: BLE001 - a bad lookup must not break the 402
         # Deliberately NOT cached: this is transient (RPC 429s, timeouts) and a
-        # cached failure would strand that builder for the whole process life.
+        # cached failure would strand that builder for the TTL after the RPC
+        # recovers (and it doesn't help a varied-code flood - every key is new).
         return PayTo(
             seller,
             split.build_split_plan(seller, None, builder_code=code),
@@ -158,8 +205,10 @@ def payto_for_request(
 
 
 def clear_cache() -> None:
-    """Drop the memoized pair→address map (tests, or after a share change)."""
+    """Drop the memoized pair→address map + the short-TTL negative cache (tests,
+    or after a share change / to retry a resolve that failed on a busy RPC)."""
     _CACHE.clear()
+    _NEG_CACHE.clear()
 
 
 if __name__ == "__main__":

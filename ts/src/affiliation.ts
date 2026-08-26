@@ -11,6 +11,10 @@
  * const aff = new Affiliation({ appCode: "bc_yourcode", sellerPayout: "0x…" });
  *
  * // ── on your x402 route ──
+ * // drop straight into express / hono / next x402 middleware:
+ * const mw = paymentMiddleware(facilitator, { "/api": { payTo: aff.payTo,
+ *                                                        extensions: aff.extensions } });
+ * // or resolve it yourself:
  * const payTo = await aff.payToFor(req.headers);   // the split, or your wallet
  * const extensions = aff.extensions;               // declares your app code `a`
  *
@@ -53,6 +57,61 @@ export const SPLITS_RETAINED_UNITS = 1n;
 const ZERO_ADDRESS: Address = "0x0000000000000000000000000000000000000000";
 const ZERO_SALT: Hex = ("0x" + "00".repeat(32)) as Hex;
 const PUBLIC_BASE_RPC = "https://mainnet.base.org";
+
+/**
+ * Negative-resolve cache tuning. An UNREGISTERED code (a clean "not registered"
+ * answer from the registry) is remembered for a short window so a *repeated*
+ * bogus code on the (unpaid) request path can't re-hit the registry on every
+ * request - each miss is otherwise one RPC call with no rate limit, which trips
+ * the public RPC's 429s and makes legitimate builders silently lose their cut.
+ *
+ * Scope: this bounds the *repeated-code* case only. A flood of *distinct* bogus
+ * codes still costs one read each (every key is new); that residual is what the
+ * paid-RPC recommendation (its own rate limits) plus fail-open cover. Transient
+ * ERRORS (429/timeout) are deliberately NOT cached, so a real builder hit by a
+ * blip retries on their next request instead of being stranded for the TTL.
+ *
+ * The TTL is short so a builder who registers just after their first request is
+ * stranded for at most that window; the size is capped so the cache itself is
+ * never an amplification vector. Mirrors the Python kit (payto.py).
+ */
+export const NEG_CACHE_TTL_MS = 60_000;
+export const NEG_CACHE_MAX = 1024;
+
+/** `X402_BASE_RPC` from the environment when available (Node), matching the
+ *  Python kit's `os.environ["X402_BASE_RPC"]` fallback. Guarded so the module
+ *  still imports in a browser / edge runtime that has no `process`. */
+function envBaseRpc(): string | undefined {
+  try {
+    return typeof process !== "undefined" ? process.env?.X402_BASE_RPC || undefined : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Monotonic milliseconds for cache TTLs - immune to wall-clock jumps (NTP / VM
+ *  migration), matching the Python kit's `time.monotonic()`. Falls back to
+ *  `Date.now` only where `performance` is unavailable. */
+function nowMs(): number {
+  return typeof performance !== "undefined" && typeof performance.now === "function"
+    ? performance.now()
+    : Date.now();
+}
+
+/** `X402_BUILDER_SHARE_BPS` from the environment (Node), matching the Python
+ *  kit. Ignored when unset, non-integer, or out of the `0..BPS_DENOM` range - a
+ *  bad value must never silently skew every split (and it would change every
+ *  split address). Same `process` guard as `envBaseRpc`. */
+function envBuilderShareBps(): number | undefined {
+  try {
+    const raw = typeof process !== "undefined" ? process.env?.X402_BUILDER_SHARE_BPS : undefined;
+    if (raw == null || raw === "") return undefined;
+    const n = Number(raw);
+    return Number.isInteger(n) && n >= 0 && n <= BPS_DENOM ? n : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /** Every builder code (a / w / s) is 1-32 lowercase letters, digits, `_`. */
 export const BUILDER_CODE_PATTERN = "^[a-z0-9_]{1,32}$";
@@ -163,8 +222,23 @@ const ERC20_ABI = [
  *  multi-recipient plan (see the README). */
 export type Recipient = [Address, number];
 
-/** What `resolve`/`payToFor` accept: a raw code, or anything header-shaped. */
-export type PayToSource = string | null | undefined | Headers | Record<string, unknown> | Map<string, unknown>;
+/** The x402 request-context shape the kit reads the builder code from: an
+ *  adapter exposing `getHeader`. This is what x402 server middleware hands a
+ *  `DynamicPayTo` callback, so accepting it lets `aff.payTo` drop straight in. */
+export interface X402RequestContext {
+  adapter: { getHeader(name: string): unknown };
+}
+
+/** What `resolve`/`payToFor`/`payTo` accept: a raw code, an x402 request
+ *  context, or anything header-shaped. */
+export type PayToSource =
+  | string
+  | null
+  | undefined
+  | X402RequestContext
+  | Headers
+  | Record<string, unknown>
+  | Map<string, unknown>;
 
 export interface SplitPlan {
   sellerPayout: Address;
@@ -199,9 +273,15 @@ export interface AffiliationOptions {
   appCode: string;
   /** Where your remainder (and every unattributed payment) is paid. */
   sellerPayout: Address;
-  /** Builder cut in basis points (1000 = 10%). Default DEFAULT_BUILDER_SHARE_BPS. */
+  /** Builder cut in basis points (1000 = 10%). Falls back to the
+   *  `X402_BUILDER_SHARE_BPS` env var (matching the Python kit), then
+   *  DEFAULT_BUILDER_SHARE_BPS. Baked into the split address, so changing it
+   *  opens a new split per builder (old funds stay safe at the old ratio). */
   builderShareBps?: number;
-  /** Base RPC. Ignored if `client` is supplied. Defaults to the (rate-limited) public RPC. */
+  /** Base RPC. Ignored if `client` is supplied. Falls back to the `X402_BASE_RPC`
+   *  env var (matching the Python kit), then the (rate-limited) public RPC. Set a
+   *  paid RPC in production - the public one 429s and a failed resolve routes
+   *  unsplit to the seller. */
   rpcUrl?: string;
   /** Inject a viem PublicClient (custom transport, tests, a shared client). */
   client?: PublicClient;
@@ -448,6 +528,9 @@ export class Affiliation {
    *  unregistered code and a lookup error are never cached, so a builder who
    *  registers after their first request isn't stranded on a stale miss. */
   private readonly cache = new Map<string, PayTo>();
+  /** code|bps → expiry-ms for NEGATIVE (unregistered) resolutions. Short-lived
+   *  and size-capped - see NEG_CACHE_TTL_MS / NEG_CACHE_MAX. */
+  private readonly negCache = new Map<string, number>();
   private _extensions?: Record<string, unknown>;
 
   constructor(opts: AffiliationOptions) {
@@ -455,13 +538,41 @@ export class Affiliation {
     if (!opts.sellerPayout) throw new Error("sellerPayout is required");
     this.appCode = opts.appCode;
     this.sellerPayout = opts.sellerPayout;
-    this.builderShareBps = opts.builderShareBps ?? DEFAULT_BUILDER_SHARE_BPS;
+    this.builderShareBps = opts.builderShareBps ?? envBuilderShareBps() ?? DEFAULT_BUILDER_SHARE_BPS;
+    // Validate here so a bad explicit share fails fast at construction (a config
+    // error), rather than later inside resolve()/payTo - which are contracted to
+    // never throw. The env path is already range-filtered in envBuilderShareBps.
+    if (
+      !Number.isInteger(this.builderShareBps) ||
+      this.builderShareBps < 0 ||
+      this.builderShareBps > BPS_DENOM
+    ) {
+      throw new RangeError(`builderShareBps must be an integer 0..${BPS_DENOM}`);
+    }
     this.client =
       opts.client ??
-      (createPublicClient({ chain: base, transport: http(opts.rpcUrl ?? PUBLIC_BASE_RPC) }) as PublicClient);
+      (createPublicClient({
+        chain: base,
+        transport: http(opts.rpcUrl ?? envBaseRpc() ?? PUBLIC_BASE_RPC),
+      }) as PublicClient);
   }
 
   // ── request path ───────────────────────────────────────────────────────────
+
+  /**
+   * Drop-in x402 `DynamicPayTo` callback - wire it straight into express / hono /
+   * next x402 middleware: `payTo: aff.payTo`. It reads `X-Builder-Code` off the
+   * request (an x402 httpContext via `ctx.adapter.getHeader`, a `Headers`, a
+   * `Map`, or a plain object) and returns the per-pair split address, or the
+   * seller wallet when there's no / unknown / unresolvable code. Never throws.
+   *
+   * It is a bound field, not a method, so passing it by reference keeps `this`
+   * (a bare `payToFor` method reference would lose it). Mirrors the Python kit's
+   * `aff.pay_to`.
+   */
+  readonly payTo = async (source: PayToSource): Promise<Address> => {
+    return (await this.resolve(source)).address;
+  };
 
   /** The route `extensions` that declare your app code `a`. */
   get extensions(): Record<string, unknown> {
@@ -481,7 +592,10 @@ export class Affiliation {
     return primaryCode(getHeader(headers, Affiliation.HEADER));
   }
 
-  /** The `payTo` address for a request - the split, or the seller wallet. Never throws. */
+  /** The `payTo` address for a request - the split, or the seller wallet. Never
+   *  throws. Accepts a raw code, an x402 request context (`ctx.adapter.getHeader`),
+   *  a `Headers`, a `Map`, or a plain object. For a bindable middleware callback
+   *  (`payTo: aff.payTo`) use the {@link payTo} field. */
   async payToFor(source: PayToSource): Promise<Address> {
     return (await this.resolve(source)).address;
   }
@@ -503,26 +617,38 @@ export class Affiliation {
     const key = `${code}|${this.builderShareBps}`;
     const cached = this.cache.get(key);
     if (cached) return cached;
+    // A recent UNREGISTERED miss short-circuits without another registry read,
+    // so a repeated bogus code can't re-hit the RPC on every request.
+    if (this.negCacheHit(key)) {
+      return {
+        address: this.sellerPayout,
+        attributed: false,
+        splitDeployed: false,
+        plan: buildSplitPlan(this.sellerPayout, null, code, this.builderShareBps),
+      };
+    }
 
     try {
       const payout = await this.payoutOf(code);
       const plan = buildSplitPlan(this.sellerPayout, payout, code, this.builderShareBps);
       if (!plan.hasBuilder) {
-        // Resolved fine, but this code isn't registered *yet*. Deliberately NOT
-        // cached: the builder may register later, and a cached miss would strand
-        // their cut (route to the seller, unsplit) for the whole process life -
-        // and a valid-format unknown code could even be used to prime it. Only
-        // positive resolutions (immutable: registered payout + CREATE2 address)
-        // are memoized.
+        // Resolved fine, but this code isn't registered *yet*. Held only in the
+        // short-TTL negative cache (not the permanent one): the builder may
+        // register later, and a lasting miss would strand their cut for the
+        // whole process life. Only positive resolutions (immutable: registered
+        // payout + CREATE2 address) are memoized permanently.
+        this.negCacheSet(key);
         return { address: this.sellerPayout, attributed: false, splitDeployed: false, plan };
       }
       const [address, deployed] = await this.predictSplitAddress(plan);
       const pt: PayTo = { address, attributed: true, splitDeployed: deployed, plan };
+      this.negCache.delete(key); // a code that now resolves is no longer a miss
       this.cache.set(key, pt);
       return pt;
     } catch (err) {
-      // Deliberately NOT cached - transient (RPC 429s); a cached failure would
-      // strand that builder for the process lifetime.
+      // Deliberately NOT cached - transient (RPC 429s / timeouts). Caching it
+      // would strand a real builder for the TTL after the RPC recovers, and it
+      // does not help the varied-code flood anyway (every key is new).
       return {
         address: this.sellerPayout,
         attributed: false,
@@ -533,9 +659,34 @@ export class Affiliation {
     }
   }
 
-  /** Drop the memoized code→split-address cache (after a share change, or a retry). */
+  /** Drop both the positive and negative resolve caches (after a share change,
+   *  or to retry a resolve that failed on a rate-limited RPC). */
   clearCache(): void {
     this.cache.clear();
+    this.negCache.clear();
+  }
+
+  /** True if `key` has a live negative entry (expired entries are swept lazily). */
+  private negCacheHit(key: string): boolean {
+    const exp = this.negCache.get(key);
+    if (exp === undefined) return false;
+    if (exp <= nowMs()) {
+      this.negCache.delete(key);
+      return false;
+    }
+    return true;
+  }
+
+  /** Record a short-TTL miss for `key`, evicting the oldest when full. Delete-
+   *  then-set moves a refreshed key to the end (Map keeps insertion order), so
+   *  eviction drops the genuinely oldest miss. */
+  private negCacheSet(key: string): void {
+    this.negCache.delete(key);
+    if (this.negCache.size >= NEG_CACHE_MAX) {
+      const oldest = this.negCache.keys().next().value;
+      if (oldest !== undefined) this.negCache.delete(oldest);
+    }
+    this.negCache.set(key, nowMs() + NEG_CACHE_TTL_MS);
   }
 
   // ── payout path ────────────────────────────────────────────────────────────
@@ -676,17 +827,34 @@ export class Affiliation {
   }
 }
 
-/** Read a header case-insensitively from Headers / Map / plain object. */
+/** Read a header case-insensitively from an x402 request context
+ *  (`ctx.adapter.getHeader`), a Headers, a Map, or a plain object. */
 function getHeader(headers: unknown, name: string): string | null {
   if (!headers) return null;
-  const h = headers as { get?: (k: string) => unknown };
-  if (typeof h.get === "function") {
-    const v = h.get(name) ?? h.get(name.toLowerCase());
-    return v == null ? null : String(v);
-  }
-  const lower = name.toLowerCase();
-  for (const [k, v] of Object.entries(headers as Record<string, unknown>)) {
-    if (k.toLowerCase() === lower) return v == null ? null : String(v);
+  // Whole body guarded: `resolve` reads the header BEFORE its try block, so a
+  // header accessor that itself throws (a broken adapter.getHeader / Headers.get)
+  // would otherwise reject `payTo`/`payToFor`, breaking the never-throws contract.
+  // Fail open to "no code" (→ seller wallet) instead.
+  try {
+    // x402 request context first: ctx.adapter.getHeader(name). Mirrors the Python
+    // kit's `_code_from`, so an x402 httpContext handed to `payTo` resolves the
+    // same way and the callback drops straight into x402 middleware.
+    const adapter = (headers as { adapter?: { getHeader?: (k: string) => unknown } }).adapter;
+    if (adapter && typeof adapter.getHeader === "function") {
+      const v = adapter.getHeader(name) ?? adapter.getHeader(name.toLowerCase());
+      return v == null ? null : String(v);
+    }
+    const h = headers as { get?: (k: string) => unknown };
+    if (typeof h.get === "function") {
+      const v = h.get(name) ?? h.get(name.toLowerCase());
+      return v == null ? null : String(v);
+    }
+    const lower = name.toLowerCase();
+    for (const [k, v] of Object.entries(headers as Record<string, unknown>)) {
+      if (k.toLowerCase() === lower) return v == null ? null : String(v);
+    }
+  } catch {
+    return null;
   }
   return null;
 }

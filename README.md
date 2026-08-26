@@ -90,7 +90,9 @@ import { Affiliation } from "x402aff";
 
 const aff = new Affiliation({ appCode: "bc_yourcode", sellerPayout: "0x…" });
 
-const payTo = await aff.payToFor(req.headers);   // the split, or your wallet
+// `aff.payTo` is a drop-in x402 DynamicPayTo callback for express/hono/next
+// middleware: `{ payTo: aff.payTo, extensions: aff.extensions }`. Or resolve it
+// yourself: `const payTo = await aff.payToFor(req.headers)`.
 const extensions = aff.extensions;               // declares your `a`
 // payouts: const { calls, balanceUnits } = await aff.release("bc_alice");
 ```
@@ -131,9 +133,10 @@ official `@x402/extensions/builder-code`. Stamping `s` by hand instead?
 ## Options
 
 **Change the cut.** Basis points, default `1000` (10%), range `0..10000` (`0` =
-attribution only). Set `X402_BUILDER_SHARE_BPS=1500` or pass
-`builder_share_bps=1500`. The ratio is baked into the split address, so changing it
-opens a *new* split per builder - old funds stay safe at the old ratio.
+attribution only). Set `X402_BUILDER_SHARE_BPS=1500` (both SDKs) or pass
+`builder_share_bps=1500` (Python) / `builderShareBps: 1500` (TS). The ratio is
+baked into the split address, so changing it opens a *new* split per builder -
+old funds stay safe at the old ratio.
 
 **More than two recipients** (platform fee, partner, …). Any recipients whose
 allocations sum to `10000`: build a `SplitPlan` directly and address-prediction +

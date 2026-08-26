@@ -81,6 +81,13 @@ class Affiliation:
             raise ValueError("app_code is required (your `a` code)")
         if not seller_payout:
             raise ValueError("seller_payout is required")
+        if builder_share_bps is not None and not (
+            0 <= builder_share_bps <= split.BPS_DENOM
+        ):
+            # Fail fast on a bad explicit share: the resolve/pay_to path is
+            # contracted to never raise, so an out-of-range value must be caught
+            # at construction, not silently routed unsplit later.
+            raise ValueError(f"builder_share_bps must be 0..{split.BPS_DENOM}")
         self.app_code = app_code
         self.seller_payout = seller_payout
         self.builder_share_bps = builder_share_bps
@@ -148,10 +155,15 @@ class Affiliation:
             return None
         if isinstance(source, str):
             return split.primary_code(source)
-        # x402 request context: ctx.adapter.get_header(name)
+        # x402 request context: ctx.adapter.get_header(name). Guarded because
+        # resolve()/pay_to are contracted to never raise, and this runs before
+        # payto's own try - a broken adapter must fail open to "no code".
         adapter = getattr(source, "adapter", None)
         if adapter is not None and hasattr(adapter, "get_header"):
-            raw = adapter.get_header(self.HEADER)
+            try:
+                raw = adapter.get_header(self.HEADER)
+            except Exception:  # noqa: BLE001 - a bad adapter must not break the 402
+                return None
             return payto.builder_code_from_headers({self.HEADER: raw} if raw else {})
         # headers-like mapping (has .get): Flask/Starlette request.headers, dict, …
         if hasattr(source, "get"):

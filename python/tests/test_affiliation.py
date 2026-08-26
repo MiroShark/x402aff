@@ -60,6 +60,15 @@ def test_custom_share_sets_effective_share():
     assert _aff(builder_share_bps=2500)._share == 2500
 
 
+def test_rejects_out_of_range_share():
+    # A bad explicit share must fail at construction, not silently unsplit later
+    # (resolve/pay_to are contracted never to raise).
+    with pytest.raises(ValueError):
+        Affiliation(app_code="bc_seller", seller_payout=SELLER, builder_share_bps=99999)
+    with pytest.raises(ValueError):
+        Affiliation(app_code="bc_seller", seller_payout=SELLER, builder_share_bps=-1)
+
+
 # ── code extraction from every source shape ───────────────────────────────────
 
 def test_code_from_raw_string_takes_primary():
@@ -69,6 +78,24 @@ def test_code_from_raw_string_takes_primary():
 def test_code_from_headers_mapping():
     aff = _aff()
     assert aff._code_from({Affiliation.HEADER: "bc_alice"}) == "bc_alice"
+
+
+class _BoomAdapter:
+    def get_header(self, name):
+        raise RuntimeError("broken adapter")
+
+
+class _BoomCtx:
+    def __init__(self):
+        self.adapter = _BoomAdapter()
+
+
+def test_code_from_bad_adapter_fails_open():
+    # A broken x402 adapter must not break the paywall - _code_from runs before
+    # payto's own try, so a throwing get_header has to fail open to "no code".
+    aff = _aff()
+    assert aff._code_from(_BoomCtx()) is None
+    assert aff.pay_to_for(_BoomCtx()) == SELLER
 
 
 def test_code_from_x402_context():
