@@ -122,3 +122,15 @@ def test_predict_split_address_parses_rpc_result(monkeypatch):
     assert addr == "0x4eDe36f2e215A06856612D4B98Afa56c3aFfFA66"
     assert exists is False
     assert captured["to"] == push_split.SPLITS_PUSH_FACTORY
+
+
+def test_env_builder_share_bps_defensive(monkeypatch):
+    # A bad X402_BUILDER_SHARE_BPS must fall back to the default, never crash at
+    # import (parity with the TS kit's envBuilderShareBps).
+    monkeypatch.delenv("X402_BUILDER_SHARE_BPS", raising=False)
+    assert push_split._env_builder_share_bps() == split.DEFAULT_BUILDER_SHARE_BPS
+    monkeypatch.setenv("X402_BUILDER_SHARE_BPS", "1500")
+    assert push_split._env_builder_share_bps() == 1500
+    for bad in ("abc", "99999", "-1", ""):
+        monkeypatch.setenv("X402_BUILDER_SHARE_BPS", bad)
+        assert push_split._env_builder_share_bps() == split.DEFAULT_BUILDER_SHARE_BPS

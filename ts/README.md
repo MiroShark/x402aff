@@ -37,15 +37,22 @@ import { Affiliation } from "x402aff";
 const aff = new Affiliation({
   appCode: "bc_yourcode",
   sellerPayout: "0xYourWallet",
-  // builderShareBps: 1000,          // 10% (default)
-  // rpcUrl: process.env.BASE_RPC,   // use a paid RPC in production
+  // builderShareBps: 1000,           // 10% (default); also read from X402_BUILDER_SHARE_BPS
+  // rpcUrl: "https://…",             // a paid Base RPC for production; also read
+  //                                  // from X402_BASE_RPC if you set no rpcUrl.
 });
 
 // ── on your x402 route ──
+// `aff.payTo` is a drop-in x402 `DynamicPayTo` callback - hand it straight to
+// express / hono / next x402 middleware (it reads X-Builder-Code off the request
+// via ctx.adapter.getHeader). It's a bound field, so pass it by reference:
+const middleware = paymentMiddleware(facilitator, {
+  "/api/data": { price: "$0.02", network: "base", payTo: aff.payTo, extensions: aff.extensions },
+});
+
+// Or resolve it yourself and wire the result in:
 const extensions = aff.extensions;                 // declares your app code `a`
 const payTo = await aff.payToFor(req.headers);     // the split, or your wallet
-// → wire `payTo` into however your x402 server middleware sets a per-request payTo,
-//   and merge `extensions` into the route's extensions.
 
 // ── the payout side (permissionless) ──
 const { calls, balanceUnits } = await aff.release("bc_alice");
@@ -86,7 +93,7 @@ See [`../docs/INTEGRATION.md`](../docs/INTEGRATION.md) and [`../python/x402aff/q
 
 ```bash
 npm run typecheck   # tsc --noEmit
-npm test            # node --test (offline, mock viem transport) - 23 tests
+npm test            # node --test (offline, mock viem transport)
 ```
 
 Runs on Node ≥ 22.18 via built-in TypeScript type-stripping; no build step.

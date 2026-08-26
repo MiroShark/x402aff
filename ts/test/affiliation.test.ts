@@ -29,6 +29,8 @@ import {
   BUILDER_CODES_REGISTRY,
   SPLITS_PUSH_FACTORY,
   USDC_BASE,
+  NEG_CACHE_TTL_MS,
+  DEFAULT_BUILDER_SHARE_BPS,
 } from "../src/affiliation.ts";
 
 const SELLER = "0x2222222222222222222222222222222222222222" as const;
@@ -231,16 +233,23 @@ test("a network failure falls back to seller AND records the error", async () =>
   assert.ok(pt.error && /boom|RPC/i.test(pt.error));
 });
 
-test("an unregistered result is NOT cached (builder registers later, gets picked up)", async () => {
-  // Registry answers "unregistered" first, then "registered" - as if the builder
-  // registers their code after their first payment. A cached miss would strand
-  // their cut for the process life; only positive resolutions are memoized.
+test("an unregistered result is negatively cached (repeated bogus code) but expires", async (t) => {
+  // A repeated unregistered code must not re-hit the registry on every request -
+  // that flood is the cost-amplification vector. It IS re-checked after the short
+  // TTL, so a builder who registers later is picked up within that bounded window.
+  // The neg cache keys on a monotonic clock (performance.now), so drive that.
+  let clock = 1000;
+  t.mock.method(globalThis.performance, "now", () => clock);
   let registered = false;
+  let registryReads = 0;
   const transport = custom({
     async request({ method, params }: { method: string; params: any }) {
       if (method === "eth_chainId") return "0x2105";
       const to = String(params[0].to).toLowerCase();
-      if (to === BUILDER_CODES_REGISTRY.toLowerCase()) return registered ? "0x" + word(BUILDER) : "0x";
+      if (to === BUILDER_CODES_REGISTRY.toLowerCase()) {
+        registryReads++;
+        return registered ? "0x" + word(BUILDER) : "0x";
+      }
       if (to === SPLITS_PUSH_FACTORY.toLowerCase()) return "0x" + word(SPLIT) + uintWord(0n);
       return "0x" + uintWord(0n);
     },
@@ -250,11 +259,105 @@ test("an unregistered result is NOT cached (builder registers later, gets picked
   const first = await a.resolve("bc_late");
   assert.equal(first.attributed, false); // not registered yet → seller, unsplit
   assert.equal(first.address, SELLER);
+  assert.equal(registryReads, 1);
 
+  // Same code again within the TTL: served from the negative cache, no new read.
+  const cachedMiss = await a.resolve("bc_late");
+  assert.equal(cachedMiss.attributed, false);
+  assert.equal(registryReads, 1); // no second registry hit
+
+  // After the TTL the miss is re-checked; the builder has since registered.
   registered = true;
+  clock += NEG_CACHE_TTL_MS + 1;
   const second = await a.resolve("bc_late");
-  assert.equal(second.attributed, true); // now resolves - not stuck on a cached miss
+  assert.equal(second.attributed, true); // picked up, bounded by the TTL
   assert.equal(second.address.toLowerCase(), SPLIT);
+  assert.equal(registryReads, 2);
+});
+
+test("a transient error is NOT negatively cached (retries on the next request)", async () => {
+  // Errors (429/timeout) must not be cached: a real builder hit by a blip has to
+  // retry once the RPC recovers, not be stranded for the TTL.
+  let fail = true;
+  const transport = custom({
+    async request({ method, params }: { method: string; params: any }) {
+      if (method === "eth_chainId") return "0x2105";
+      const to = String(params[0].to).toLowerCase();
+      if (to === BUILDER_CODES_REGISTRY.toLowerCase()) {
+        if (fail) throw new Error("429 rate limited");
+        return "0x" + word(BUILDER);
+      }
+      if (to === SPLITS_PUSH_FACTORY.toLowerCase()) return "0x" + word(SPLIT) + uintWord(0n);
+      return "0x" + uintWord(0n);
+    },
+  });
+  const a = aff(createPublicClient({ chain: base, transport }) as PublicClient);
+
+  const r1 = await a.resolve("bc_alice");
+  assert.equal(r1.attributed, false);
+  assert.ok(r1.error);
+  fail = false;
+  // A neg-cached error would return an unattributed seller here; a live retry
+  // resolves to the split. `attributed === true` is the proof it retried.
+  const r2 = await a.resolve("bc_alice");
+  assert.equal(r2.attributed, true);
+  assert.equal(r2.address.toLowerCase(), SPLIT);
+});
+
+test("builderShareBps falls back to X402_BUILDER_SHARE_BPS env, arg wins, bad values ignored", () => {
+  const prev = process.env.X402_BUILDER_SHARE_BPS;
+  try {
+    process.env.X402_BUILDER_SHARE_BPS = "2500";
+    const fromEnv = new Affiliation({ appCode: "bc_seller", sellerPayout: SELLER });
+    assert.equal(fromEnv.builderShareBps, 2500);
+
+    // an explicit constructor arg still wins over the env var (750 ≠ env 2500
+    // and ≠ the default, so this isolates arg precedence from both)
+    const argWins = new Affiliation({ appCode: "bc_seller", sellerPayout: SELLER, builderShareBps: 750 });
+    assert.equal(argWins.builderShareBps, 750);
+
+    // out-of-range / non-integer env is ignored → the default, never a skewed split
+    process.env.X402_BUILDER_SHARE_BPS = "99999";
+    assert.equal(new Affiliation({ appCode: "bc_seller", sellerPayout: SELLER }).builderShareBps, DEFAULT_BUILDER_SHARE_BPS);
+    process.env.X402_BUILDER_SHARE_BPS = "abc";
+    assert.equal(new Affiliation({ appCode: "bc_seller", sellerPayout: SELLER }).builderShareBps, DEFAULT_BUILDER_SHARE_BPS);
+  } finally {
+    if (prev === undefined) delete process.env.X402_BUILDER_SHARE_BPS;
+    else process.env.X402_BUILDER_SHARE_BPS = prev;
+  }
+});
+
+test("an out-of-range explicit builderShareBps throws at construction (not later)", () => {
+  assert.throws(
+    () => new Affiliation({ appCode: "bc_seller", sellerPayout: SELLER, builderShareBps: 99999 }),
+    /0\.\.10000/,
+  );
+  assert.throws(
+    () => new Affiliation({ appCode: "bc_seller", sellerPayout: SELLER, builderShareBps: -1 }),
+    /0\.\.10000/,
+  );
+});
+
+test("payTo never throws even when the header accessor itself throws", async () => {
+  const a = aff(mockClient({ payout: BUILDER, deployed: false }));
+  // A broken adapter / Headers.get must fail open to the seller, not reject.
+  const boomAdapter = { adapter: { getHeader: () => { throw new Error("adapter boom"); } } };
+  assert.equal(await a.payTo(boomAdapter), SELLER);
+  const boomGet = { get: () => { throw new Error("get boom"); } };
+  assert.equal(await a.payToFor(boomGet as unknown as Headers), SELLER);
+});
+
+test("payTo is a bound drop-in callback that reads an x402 httpContext", async () => {
+  // The DynamicPayTo shape x402 middleware passes: ctx.adapter.getHeader(name).
+  const a = aff(mockClient({ payout: BUILDER, deployed: false }));
+  const ctx = {
+    adapter: { getHeader: (n: string) => (n.toLowerCase() === "x-builder-code" ? "bc_alice" : null) },
+  };
+  // Pass by reference (no wrapper) to prove `this` stays bound.
+  const cb = a.payTo;
+  assert.equal((await cb(ctx)).toLowerCase(), SPLIT);
+  // No code in the context → seller fallback, never a throw.
+  assert.equal(await a.payTo({ adapter: { getHeader: () => null } }), SELLER);
 });
 
 // ── facade: payout path ───────────────────────────────────────────────────────
