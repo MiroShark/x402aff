@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/hero-animated.svg" alt="x402aff — Split every payment. 10% builder cut, one line client-side, zero contracts to run. The money path flows request → settle → split → payout. Builder-code affiliation for x402 sellers: give the apps that send you paying users a cut, enforced on-chain at settlement via an ownerless, immutable 0xSplits contract. Keywords: x402, Base builder codes, 0xSplits, affiliate, revenue share, USDC, CDP facilitator." width="100%" />
+  <img src="docs/images/hero.gif" alt="x402aff - Split every payment. 10% builder cut, one line client-side, zero contracts to run. The money path flows request, settle, split, payout. Builder-code affiliation for x402 sellers: give the apps that send you paying users a cut, enforced on-chain at settlement via an ownerless, immutable 0xSplits contract. Keywords: x402, Base builder codes, 0xSplits, affiliate, revenue share, USDC, CDP facilitator." width="100%" />
 </p>
 
 <h1 align="center">Split every <em>payment.</em></h1>
