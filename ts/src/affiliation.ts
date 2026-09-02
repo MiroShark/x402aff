@@ -493,10 +493,17 @@ export interface SplitsPayload {
   splits: SplitRow[];
 }
 
+/** CDP infrastructure stamps on the role-flat attribution table, not referers.
+ *  `cdp_facil*` is the facilitator `w`; `cdp_sdk*` is the SDK's own `s`
+ *  (`cdp_sdk_server` / `cdp_sdk_client`). Mirror of Python `_INFRA_PREFIXES`. */
+function isInfraCode(code: string): boolean {
+  return code.startsWith("cdp_facil") || code.startsWith("cdp_sdk");
+}
+
 /** Distinct `s` codes that settled alongside our `a` (role-flat table): every
- *  code on any tx that also carried our app code, minus our own and the
- *  facilitator's. Reorg-safe via `HAVING sum(action) > 0`. Mirror of the Python
- *  kit's monitor.discover_builder_codes. */
+ *  code on any tx that also carried our app code, minus our own and CDP
+ *  infrastructure stamps. Reorg-safe via `HAVING sum(action) > 0`. Mirror of
+ *  the Python kit's monitor.discover_builder_codes. */
 export async function discoverBuilderCodes(query: CdpQuery, appCode: string, days = 90): Promise<string[]> {
   const a = appCode.replace(/'/g, "");
   const d = Math.trunc(days);
@@ -510,7 +517,7 @@ export async function discoverBuilderCodes(query: CdpQuery, appCode: string, day
   );
   return rows
     .map((r) => String(r.builder_code ?? ""))
-    .filter((c) => c && c !== appCode && !c.startsWith("cdp_facil"));
+    .filter((c) => c && c !== appCode && !isInfraCode(c));
 }
 
 

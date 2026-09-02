@@ -135,9 +135,9 @@ ORDER BY total_units DESC;
 --     code IS the per-split count. Swap 'bc_yourcode' for your own `a`.
 --
 --     Confirmed live on Base mainnet 2026-07-24 (200, 4 rows) where #5b 400s.
---     Rows come back as {builder_code, payments}; your own `a` and the
---     facilitator (cdp_facil*) appear too - filter them the way
---     monitor.discover_builder_codes does.
+--     Rows come back as {builder_code, payments}; your own `a`, the
+--     facilitator (cdp_facil*), and CDP SDK service codes (cdp_sdk*) appear
+--     too - filter them the way monitor.discover_builder_codes does.
 -- ─────────────────────────────────────────────────────────────────────────────
 SELECT builder_code, count(DISTINCT transaction_hash) AS payments
 FROM base.transaction_attributions

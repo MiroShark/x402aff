@@ -27,8 +27,11 @@ from . import cdp_sql, distribute, push_split, resolver, split
 APP_CODE = os.environ.get("X402_BUILDER_CODE", "")
 SELLER_PAYOUT = os.environ.get("X402_SELLER_PAYOUT", "")
 SHARE_BPS = push_split.BUILDER_SHARE_BPS
-# Facilitator wallet codes are never the referer; skip anything that looks like one.
-_FACIL_PREFIX = "cdp_facil"
+# Role-flat CDP index: every code on the tx shows up as builder_code. These
+# prefixes are infrastructure stamps, not referers.
+#   cdp_facil*  - facilitator wallet code (`w`)
+#   cdp_sdk*    - CDP SDK service codes (`s`): cdp_sdk_server / cdp_sdk_client
+_INFRA_PREFIXES = ("cdp_facil", "cdp_sdk")
 
 
 @dataclass
@@ -65,7 +68,8 @@ def discover_builder_codes(app_code: str, *, days: int = 90) -> list[str]:
     """Distinct `s` codes that settled alongside our `a`, via the CDP SQL API.
 
     Role-flat table, so we take every code on any tx that also carried our app
-    code, then drop our own code and the facilitator's. Reorg-safe via
+    code, then drop our own code and CDP infrastructure stamps (facilitator
+    ``cdp_facil*``, SDK service codes ``cdp_sdk*``). Reorg-safe via
     ``HAVING sum(action) > 0``.
     """
     a = app_code.replace("'", "")
@@ -82,7 +86,7 @@ def discover_builder_codes(app_code: str, *, days: int = 90) -> list[str]:
     """
     rows = cdp_sql.run_query(sql, max_age_ms=5000)
     codes = [r["builder_code"] for r in rows if r.get("builder_code")]
-    return [c for c in codes if c != app_code and not c.startswith(_FACIL_PREFIX)]
+    return [c for c in codes if c != app_code and not c.startswith(_INFRA_PREFIXES)]
 
 
 def status_for(code: str, *, seller_payout: str, rpc_url: Optional[str] = None) -> SplitStatus:
