@@ -23,10 +23,12 @@ def _rows(*codes):
     return [{"builder_code": c} for c in codes]
 
 
-def test_discover_drops_our_own_code_and_the_facilitator(monkeypatch):
+def test_discover_drops_our_own_code_and_cdp_infra_stamps(monkeypatch):
     monkeypatch.setattr(cdp_sql, "run_query",
-                        lambda sql, max_age_ms=None: _rows("bc_alice", "bc_seller",
-                                                           "cdp_facil_1", "bc_bob"))
+                        lambda sql, max_age_ms=None: _rows(
+                            "bc_alice", "bc_seller",
+                            "cdp_facil_1", "cdp_sdk_server", "cdp_sdk_client",
+                            "bc_bob"))
     assert monitor.discover_builder_codes("bc_seller") == ["bc_alice", "bc_bob"]
 
 

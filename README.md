@@ -220,6 +220,9 @@ Three view-calls against two contracts - port
 - **`s` is a self-asserted tag**, not signed proof of who drove a payment. Resolving
   it says *where* money goes (the code's registered payout), not who is *entitled*
   to it - a routing opt-in, the right level for an affiliate program.
+- **CDP SDK stamps `cdp_sdk_server` / `cdp_sdk_client`** as service codes on every
+  settlement. That is SDK telemetry, not your builder identity. Pass `builderCode`
+  as `a`. Discovery drops `cdp_sdk*` the same way it drops `cdp_facil*`.
 - **No keys, no custody.** `payTo` is just an address in the 402, settlement is the
   buyer's gasless CDP payment, and `distribute` is permissionless. Nothing here
   needs a private key.

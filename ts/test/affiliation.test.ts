@@ -15,6 +15,7 @@ import type { PublicClient } from "viem";
 
 import {
   Affiliation,
+  discoverBuilderCodes,
   toTokenId,
   primaryCode,
   buildSplitPlan,
@@ -400,6 +401,18 @@ test("a custom builder share changes the split address it resolves", async () =>
   assert.notEqual(isDeployedCalldata(p10), isDeployedCalldata(p25));
 });
 
+test("discoverBuilderCodes drops app code and CDP infra stamps", async () => {
+  const query = async () => [
+    { builder_code: "bc_alice" },
+    { builder_code: "bc_seller" },
+    { builder_code: "cdp_facil_1" },
+    { builder_code: "cdp_sdk_server" },
+    { builder_code: "cdp_sdk_client" },
+    { builder_code: "bc_bob" },
+  ];
+  assert.deepEqual(await discoverBuilderCodes(query, "bc_seller"), ["bc_alice", "bc_bob"]);
+});
+
 test("splitsPayload shapes rows and filters the marker", async () => {
   const a = aff(mockClient({ payout: BUILDER, deployed: false, balance: 1_000_000n }));
   // Injected CDP query. The marker rides along as a "builder" and must be
@@ -414,12 +427,14 @@ test("splitsPayload shapes rows and filters the marker", async () => {
       { builder_code: "x402aff" },
       { builder_code: "bc_seller" },
       { builder_code: "cdp_facil1" },
+      { builder_code: "cdp_sdk_server" },
+      { builder_code: "cdp_sdk_client" },
     ];
   };
   const payload = await a.splitsPayload(query);
   assert.equal(payload.configured, true);
   assert.equal(payload.marker, "x402aff");
-  assert.equal(payload.count, 1); // marker + appCode + facilitator filtered out
+  assert.equal(payload.count, 1); // marker + appCode + CDP infra stamps filtered out
   const s = payload.splits[0];
   assert.equal(s.payTo.toLowerCase(), SPLIT.toLowerCase());
   assert.equal(s.sellerCode, "bc_seller");

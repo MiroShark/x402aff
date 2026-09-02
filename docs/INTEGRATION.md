@@ -185,6 +185,11 @@ exactly the right shape.
   stranded.
 - **Multiple `s` codes** (layered clients, comma-joined) → the split pays the
   **primary** (first valid) code. Single-`s` policy for v1.
+- **CDP SDK service codes.** `createX402Server` always stamps `cdp_sdk_server`
+  as `s` (and `CdpX402Client` stamps `cdp_sdk_client`). That is CDP's
+  service-level attribution, not builder identity. Your app identity is `a`
+  (`builderCode` / `declare_builder_code`). Discovery drops `cdp_sdk*` the same
+  way it drops the facilitator (`cdp_facil*`); they never become a split.
 - **Mainnet + CDP only.** The registry, the Splits factory, and on-chain
   attribution all live on Base mainnet via the CDP facilitator. Testnet / the free
   `x402.org` facilitator write nothing and have nothing to resolve against.
