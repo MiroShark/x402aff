@@ -30,7 +30,49 @@ on:
         default: both
 
 jobs:
+  # Mirror ci.yml so a tag can only publish a tree that passes CI. Both publish
+  # jobs below `needs` this. The two matrix legs cover the same version floors and
+  # ceilings ci.yml checks (Python 3.9/3.13, Node 22/24) and the package job's
+  # build + registry-metadata validation.
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - python-version: "3.9"
+            node-version: "22"
+          - python-version: "3.13"
+            node-version: "24"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -e '.[dev]' build twine
+        working-directory: python
+      - run: pytest
+        working-directory: python
+      - run: python -m build
+        working-directory: python
+      - run: twine check python/dist/*
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: ts/package-lock.json
+      - run: npm ci
+        working-directory: ts
+      - run: npm run typecheck
+        working-directory: ts
+      - run: npm test
+        working-directory: ts
+      - run: npm run build
+        working-directory: ts
+      - run: npm pack --dry-run
+        working-directory: ts
+
   pypi:
+    needs: [test]
     if: ${{ github.event_name == 'push' || inputs.target == 'both' || inputs.target == 'pypi' }}
     runs-on: ubuntu-latest
     environment: pypi
@@ -74,6 +116,7 @@ jobs:
           packages-dir: python/dist
 
   npm:
+    needs: [test]
     if: ${{ github.event_name == 'push' || inputs.target == 'both' || inputs.target == 'npm' }}
     runs-on: ubuntu-latest
     permissions:
