@@ -174,8 +174,8 @@ app.get("/splits", async (_req, res) =>   // TS (Express) - pass your CDP SQL ru
 Deliberately **no per-split payment count**: getting one alongside the received
 USDC amount means joining `base.events`, which trips the CDP SQL API's leaf-scan
 limit (measured 94.44 GiB against a 93.13 GiB cap) and 400s. For just the count,
-[`queries.sql`](./python/x402aff/queries.sql) #5c reads the attribution table alone
-- no join, confirmed working. #5b records why the amount can't come cheaply.
+[`queries.sql`](./python/x402aff/queries.sql) #5c reads the attribution table
+alone - no join, confirmed working. #5b records why the amount can't come cheaply.
 
 ### Discover every kit payment (any seller)
 
