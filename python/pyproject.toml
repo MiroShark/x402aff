@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "x402aff"
-version = "0.3.0"
+version = "0.3.1"
 description = "Builder-code affiliation for x402 sellers - route each payment to a per-(seller, builder) 0xSplits split."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -48,9 +48,9 @@ cdp = ["cdp-sdk>=1.0"]
 dev = ["pytest>=7.0"]
 
 [project.urls]
-Homepage = "https://github.com/MiroShark/x402aff"
+Homepage = "https://www.x402aff.xyz"
 Repository = "https://github.com/MiroShark/x402aff"
-Documentation = "https://github.com/MiroShark/x402aff/blob/main/docs/INTEGRATION.md"
+Documentation = "https://www.x402aff.xyz/developers"
 Issues = "https://github.com/MiroShark/x402aff/issues"
 
 [tool.setuptools]

@@ -273,6 +273,7 @@ elsewhere.
 | [`ts/`](./ts) · [`python/`](./python) | **Start here** - the `Affiliation` facades. |
 | [`docs/INTEGRATION.md`](./docs/INTEGRATION.md) | Integration deep-dive (money path, trust model, wiring, caveats). |
 | [`fork-test/`](./fork-test) | Foundry proof against live Base contracts on a mainnet fork. |
+| [`skills/x402aff/`](./skills/x402aff/SKILL.md) | Agent skill that teaches a coding agent to wire the kit into an x402 seller. |
 | `python/x402aff/{resolver,split,push_split,payto,distribute,monitor}.py` | The primitives the facades wrap. |
 
 ```bash
@@ -285,6 +286,8 @@ cd fork-test && forge test     # mainnet-fork proof
 
 ## References
 
+- Website and developer docs: [www.x402aff.xyz](https://www.x402aff.xyz) · [developers](https://www.x402aff.xyz/developers) · [llms.txt](https://www.x402aff.xyz/llms.txt)
+- Agent skill: [`skills/x402aff/SKILL.md`](./skills/x402aff/SKILL.md), install it into your coding agent with `npx skills add MiroShark/x402aff`
 - [ERC-8021 builder-code spec](https://github.com/x402-foundation/x402/blob/main/specs/extensions/builder_code.md) · [CDP Builder Codes](https://docs.cdp.coinbase.com/x402/core-concepts/builder-codes)
 - [Base Builder Codes](https://docs.base.org/apps/builder-codes/builder-codes) · registry [`github.com/base/builder-codes`](https://github.com/base/builder-codes)
 - [0xSplits PushSplit V2](https://splits.org/protocol/docs/core/split-v2) · factory `0x8E8eB0cC6AE34A38B67D5Cf91ACa38f60bc3Ecf4`
