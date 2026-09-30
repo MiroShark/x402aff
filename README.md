@@ -12,10 +12,7 @@
 </p>
 
 <p align="center">
-  <b>10%</b> · builder cut &nbsp;·&nbsp; <b>1 line</b> · client side &nbsp;·&nbsp; <b>0</b> · contracts to run
-</p>
-<p align="center">
-  <b>On-chain</b> · at settlement &nbsp;·&nbsp; <b>Ownerless</b> · immutable 0xSplits &nbsp;·&nbsp; <b>Base mainnet</b> · proven
+  <img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/proof.webp" alt="The kit in four numbers: 10% default builder cut (1000 bps, set anywhere from 0 to 10000), 1 line on the buyer's client, 0 contracts to run, 7 mainnet-fork tests (5 of them adversarial)." width="100%" />
 </p>
 
 <div align="center">
@@ -30,8 +27,6 @@
 
 ---
 
-<img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/coins.webp" alt="" align="right" width="200" />
-
 <b>Give the apps that send you paying users a cut - enforced on-chain, at settlement, with no facilitator of your own to run.</b>
 
 If you sell an API behind an [x402](https://x402.org) paywall, this splits each
@@ -39,6 +34,10 @@ payment so the builder whose app drove it earns a share (default **10%**). The c
 lands in an ownerless, immutable [0xSplits](https://splits.org) contract at
 settlement, so once it's there **nobody - including you - can redirect it**. That's
 what makes it a credible offer rather than a promise.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/problem.webp" alt="Off-chain affiliate promises vs. an on-chain split. Before: you track referrals in a database, pay out monthly, and can change the rate or pause payouts; builders cannot verify a thing. After, with x402aff: the payment lands in an ownerless 0xSplits contract, split at settlement in the same USDC transfer, recipients and ratio baked into the address, and anyone can trigger the payout." width="100%" />
+</p>
 
 No settler, no self-run facilitator, no contract you write or audit: the stock CDP
 facilitator settles (gas sponsored), an audited 0xSplits contract splits, and the
@@ -51,6 +50,10 @@ builder adds *one line* to their x402 client.
 ---
 
 ## How it works
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/how.webp" alt="How payment works: 01 Request, the buyer's app calls your route with its builder code. 02 402, your API answers with payTo set to the (you, builder) split address. 03 Settle, the CDP facilitator settles the gasless USDC payment into the split and writes a/s/w on-chain. 04 Payout, anyone calls distribute: 10% to the builder, 90% to you." width="100%" />
+</p>
 
 Base [Builder Codes](https://docs.cdp.coinbase.com/x402/core-concepts/builder-codes)
 put three tags on a paid request: **`a`** (you, the API), **`s`** (the builder that
@@ -131,6 +134,10 @@ official `@x402/extensions/builder-code`. Stamping `s` by hand instead?
 ---
 
 ## Options
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/features.webp" alt="Everything a seller needs, nothing to operate: change the cut, more than two recipients, release payouts, claims dashboard, find every kit payment, any language." width="100%" />
+</p>
 
 **Change the cut.** Basis points, default `1000` (10%), range `0..10000` (`0` =
 attribution only). Set `X402_BUILDER_SHARE_BPS=1500` (both SDKs) or pass
@@ -232,6 +239,10 @@ Full trust model, edge cases, and caveats: [`INTEGRATION.md`](./docs/INTEGRATION
 ---
 
 ## Security
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/security.webp" alt="Money in a split can only reach two addresses. Attacks on a funded split and their results: trigger distribute as distributor (pays out, you get 0), tampered struct (reverts), hijacking split at the funded address (impossible), updateSplit or setPaused (reverts, ownerless), front-run the deploy (still pays builder and seller)." width="100%" />
+</p>
 
 **The kit deploys no contracts of its own.** It only *reads* two canonical
 third-party contracts and lets the stock CDP facilitator settle into them - no new
