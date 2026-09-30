@@ -1,14 +1,14 @@
 <p align="center">
-  <a href="https://www.x402aff.xyz"><img src="docs/images/banner.png" alt="x402aff - Split every payment. Builder-code affiliation for x402: give the apps that send you paying users a cut, enforced on-chain at settlement. One line on the client, no facilitator of your own to run. 10% default builder cut, 1 line on the buyer's client, 0 contracts to run, 7 mainnet fork tests." width="100%" /></a>
+  <a href="https://www.x402aff.xyz"><img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/banner.png" alt="x402aff - Split every payment. Builder-code affiliation for x402: give the apps that send you paying users a cut, enforced on-chain at settlement. One line on the client, no facilitator of your own to run. 10% default builder cut, 1 line on the buyer's client, 0 contracts to run, 7 mainnet fork tests." width="100%" /></a>
 </p>
 
 <p align="center">
   <strong>Get it&nbsp;→</strong>&nbsp;&nbsp;
-  <a href="https://github.com/MiroShark/x402aff/stargazers"><img src="docs/images/btn-star.svg" alt="Star x402aff on GitHub" height="34" align="absmiddle"></a>&nbsp;&nbsp;
-  <a href="https://pypi.org/project/x402aff/"><img src="docs/images/btn-pypi.svg" alt="x402aff on PyPI" height="34" align="absmiddle"></a>&nbsp;&nbsp;
-  <a href="https://www.npmjs.com/package/x402aff"><img src="docs/images/btn-npm.svg" alt="x402aff on npm" height="34" align="absmiddle"></a>&nbsp;&nbsp;
-  <a href="https://www.miroshark.xyz/x402aff"><img src="docs/images/btn-dashboard.svg" alt="Live claims dashboard at miroshark.xyz/x402aff" height="34" align="absmiddle"></a>&nbsp;&nbsp;
-  <a href="./docs/INTEGRATION.md"><img src="docs/images/btn-docs.svg" alt="Integration docs" height="34" align="absmiddle"></a>
+  <a href="https://github.com/MiroShark/x402aff/stargazers"><img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/btn-star.svg" alt="Star x402aff on GitHub" height="34" align="absmiddle"></a>&nbsp;&nbsp;
+  <a href="https://pypi.org/project/x402aff/"><img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/btn-pypi.svg" alt="x402aff on PyPI" height="34" align="absmiddle"></a>&nbsp;&nbsp;
+  <a href="https://www.npmjs.com/package/x402aff"><img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/btn-npm.svg" alt="x402aff on npm" height="34" align="absmiddle"></a>&nbsp;&nbsp;
+  <a href="https://www.miroshark.xyz/x402aff"><img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/btn-dashboard.svg" alt="Live claims dashboard at miroshark.xyz/x402aff" height="34" align="absmiddle"></a>&nbsp;&nbsp;
+  <a href="./docs/INTEGRATION.md"><img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/btn-docs.svg" alt="Integration docs" height="34" align="absmiddle"></a>
 </p>
 
 <p align="center">
@@ -30,7 +30,7 @@
 
 ---
 
-<img src="docs/images/coins.webp" alt="" align="right" width="200" />
+<img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/coins.webp" alt="" align="right" width="200" />
 
 <b>Give the apps that send you paying users a cut - enforced on-chain, at settlement, with no facilitator of your own to run.</b>
 
@@ -295,7 +295,7 @@ cd fork-test && forge test     # mainnet-fork proof
 ---
 
 <p align="center">
-  <a href="https://www.x402aff.xyz"><img src="docs/images/jackpot.webp" alt="A clay arcade cabinet spilling lime coins" width="360" /></a>
+  <a href="https://www.x402aff.xyz"><img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/jackpot.webp" alt="A clay arcade cabinet spilling lime coins" width="360" /></a>
 </p>
 
 <h3 align="center">Give builders a reason to send you buyers.</h3>
