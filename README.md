@@ -1,16 +1,14 @@
 <p align="center">
-  <img src="docs/images/hero.gif" alt="x402aff - Split every payment. 10% builder cut, one line client-side, zero contracts to run. The money path flows request, settle, split, payout. Builder-code affiliation for x402 sellers: give the apps that send you paying users a cut, enforced on-chain at settlement via an ownerless, immutable 0xSplits contract. Keywords: x402, Base builder codes, 0xSplits, affiliate, revenue share, USDC, CDP facilitator." width="100%" />
+  <a href="https://www.x402aff.xyz"><img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/banner.png" alt="x402aff - Split every payment. Builder-code affiliation for x402: give the apps that send you paying users a cut, enforced on-chain at settlement. One line on the client, no facilitator of your own to run. 10% default builder cut, 1 line on the buyer's client, 0 contracts to run, 7 mainnet fork tests." width="100%" /></a>
 </p>
-
-<h1 align="center">Split every <em>payment.</em></h1>
 
 <p align="center">
   <strong>Get it&nbsp;→</strong>&nbsp;&nbsp;
-  <a href="https://github.com/MiroShark/x402aff/stargazers"><img src="docs/images/btn-star.svg" alt="Star x402aff on GitHub" height="34" align="absmiddle"></a>&nbsp;&nbsp;
-  <a href="https://pypi.org/project/x402aff/"><img src="docs/images/btn-pypi.svg" alt="x402aff on PyPI" height="34" align="absmiddle"></a>&nbsp;&nbsp;
-  <a href="https://www.npmjs.com/package/x402aff"><img src="docs/images/btn-npm.svg" alt="x402aff on npm" height="34" align="absmiddle"></a>&nbsp;&nbsp;
-  <a href="https://www.miroshark.xyz/x402aff"><img src="docs/images/btn-dashboard.svg" alt="Live claims dashboard at miroshark.xyz/x402aff" height="34" align="absmiddle"></a>&nbsp;&nbsp;
-  <a href="./docs/INTEGRATION.md"><img src="docs/images/btn-docs.svg" alt="Integration docs" height="34" align="absmiddle"></a>
+  <a href="https://github.com/MiroShark/x402aff/stargazers"><img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/btn-star.svg" alt="Star x402aff on GitHub" height="34" align="absmiddle"></a>&nbsp;&nbsp;
+  <a href="https://pypi.org/project/x402aff/"><img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/btn-pypi.svg" alt="x402aff on PyPI" height="34" align="absmiddle"></a>&nbsp;&nbsp;
+  <a href="https://www.npmjs.com/package/x402aff"><img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/btn-npm.svg" alt="x402aff on npm" height="34" align="absmiddle"></a>&nbsp;&nbsp;
+  <a href="https://www.miroshark.xyz/x402aff"><img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/btn-dashboard.svg" alt="Live claims dashboard at miroshark.xyz/x402aff" height="34" align="absmiddle"></a>&nbsp;&nbsp;
+  <a href="./docs/INTEGRATION.md"><img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/btn-docs.svg" alt="Integration docs" height="34" align="absmiddle"></a>
 </p>
 
 <p align="center">
@@ -31,6 +29,8 @@
 </div>
 
 ---
+
+<img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/coins.webp" alt="" align="right" width="200" />
 
 <b>Give the apps that send you paying users a cut - enforced on-chain, at settlement, with no facilitator of your own to run.</b>
 
@@ -172,8 +172,8 @@ app.get("/splits", async (_req, res) =>   // TS (Express) - pass your CDP SQL ru
 Deliberately **no per-split payment count**: getting one alongside the received
 USDC amount means joining `base.events`, which trips the CDP SQL API's leaf-scan
 limit (measured 94.44 GiB against a 93.13 GiB cap) and 400s. For just the count,
-[`queries.sql`](./python/x402aff/queries.sql) #5c reads the attribution table alone
-- no join, confirmed working. #5b records why the amount can't come cheaply.
+[`queries.sql`](./python/x402aff/queries.sql) #5c reads the attribution table
+alone - no join, confirmed working. #5b records why the amount can't come cheaply.
 
 ### Discover every kit payment (any seller)
 
@@ -291,6 +291,19 @@ cd fork-test && forge test     # mainnet-fork proof
 - [ERC-8021 builder-code spec](https://github.com/x402-foundation/x402/blob/main/specs/extensions/builder_code.md) · [CDP Builder Codes](https://docs.cdp.coinbase.com/x402/core-concepts/builder-codes)
 - [Base Builder Codes](https://docs.base.org/apps/builder-codes/builder-codes) · registry [`github.com/base/builder-codes`](https://github.com/base/builder-codes)
 - [0xSplits PushSplit V2](https://splits.org/protocol/docs/core/split-v2) · factory `0x8E8eB0cC6AE34A38B67D5Cf91ACa38f60bc3Ecf4`
+
+---
+
+<p align="center">
+  <a href="https://www.x402aff.xyz"><img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/jackpot.webp" alt="A clay arcade cabinet spilling lime coins" width="360" /></a>
+</p>
+
+<h3 align="center">Give builders a reason to send you buyers.</h3>
+
+<p align="center">
+  MIT licensed. Python and TypeScript. Live on Base mainnet.<br />
+  <a href="https://www.x402aff.xyz"><b>www.x402aff.xyz</b></a>
+</p>
 
 ---
 
