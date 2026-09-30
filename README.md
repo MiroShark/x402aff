@@ -2,8 +2,6 @@
   <a href="https://www.x402aff.xyz"><img src="docs/images/banner.png" alt="x402aff - Split every payment. Builder-code affiliation for x402: give the apps that send you paying users a cut, enforced on-chain at settlement. One line on the client, no facilitator of your own to run. 10% default builder cut, 1 line on the buyer's client, 0 contracts to run, 7 mainnet fork tests." width="100%" /></a>
 </p>
 
-<h1 align="center">Split every <em>payment.</em></h1>
-
 <p align="center">
   <strong>Get it&nbsp;→</strong>&nbsp;&nbsp;
   <a href="https://github.com/MiroShark/x402aff/stargazers"><img src="docs/images/btn-star.svg" alt="Star x402aff on GitHub" height="34" align="absmiddle"></a>&nbsp;&nbsp;
