@@ -47,6 +47,11 @@ aff = Affiliation(app_code="bc_yourcode", seller_payout="0xYourWallet")
 calls, balance = aff.release("bc_alice")
 ```
 
+`aff.resolve(request)` returns the full `PayTo`, including `status`
+(`resolved` / `unregistered` / `invalid` / `error` / `none`). Echo it in the
+`aff.STATUS_HEADER` (`X-Builder-Code-Status`) response header so a builder can
+tell a working code from an unminted or mistyped one.
+
 Full integration guide (money path, trust model, wiring, caveats):
 [`../docs/INTEGRATION.md`](../docs/INTEGRATION.md). The TypeScript port lives in
 [`../ts/`](../ts) and resolves the identical split address.

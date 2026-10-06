@@ -113,9 +113,22 @@ facade wraps the modules below.
 3. **Point at the CDP facilitator** (mainnet). No custom facilitator, no keys.
 4. **Warm the cache** (optional) for expected builders at startup, so the first
    402 for each needs no live RPC call - the public RPC rate-limits.
+5. **Echo the status** (recommended). Set the `X-Builder-Code-Status` response
+   header (`payto.STATUS_HEADER`) from `PayTo.status`: `resolved`,
+   `unregistered`, `invalid`, `error`, or `none`. Every fallback otherwise looks
+   like a normal 402, so a builder with an unminted or mistyped code would earn
+   0% without knowing. With the header it can assert `resolved` at startup.
 
 The [`Affiliation`](../python/x402aff/affiliation.py) facade does 1-2 for you: pass
-`extensions=aff.extensions` and `pay_to=aff.pay_to` to your route.
+`extensions=aff.extensions` and `pay_to=aff.pay_to` to your route. For 5, wrap the
+callback so the status reaches your response, e.g. in Flask:
+
+```python
+def pay_to(ctx):
+    pt = aff.resolve(ctx)              # cached; the same call aff.pay_to makes
+    g.builder_code_status = pt.status  # then set aff.STATUS_HEADER on the response
+    return pt.address
+```
 
 ## 5. Distribution & monitoring
 
@@ -182,7 +195,11 @@ exactly the right shape.
 ## 7. Edge cases & caveats
 
 - **No / unregistered / blank code** → `payTo` = your wallet, 100% to you, never
-  stranded.
+  stranded. `PayTo.status` says which (`none` / `unregistered` / `invalid`).
+- **A code shown on base.dev is not always minted on-chain.** Only a minted code
+  resolves. Check with `cast call 0x000000BC7E6457e610fe52Dcc0ca5b3ce59C8E80
+  'isRegistered(string)(bool)' bc_yourcode`; `false` means it earns nothing until
+  Base mints it.
 - **Multiple `s` codes** (layered clients, comma-joined) → the split pays the
   **primary** (first valid) code. Single-`s` policy for v1.
 - **CDP SDK service codes.** `createX402Server` always stamps `cdp_sdk_server`

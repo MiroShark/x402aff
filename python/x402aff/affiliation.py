@@ -34,6 +34,7 @@ actually use CDP-index discovery.
 """
 from __future__ import annotations
 
+import dataclasses
 import logging
 from typing import TYPE_CHECKING, Any, Optional
 
@@ -68,6 +69,8 @@ class Affiliation:
 
     #: The request header a buyer's client sets to name its builder.
     HEADER = payto.BUILDER_CODE_HEADER
+    #: The response header to echo ``PayTo.status`` in (see :meth:`resolve`).
+    STATUS_HEADER = payto.STATUS_HEADER
 
     def __init__(
         self,
@@ -137,14 +140,20 @@ class Affiliation:
         a spike there means the RPC is rate-limiting and builders are silently
         losing their cut.
         """
+        sent = code
         if code is None:
             code = self._code_from(source)
+            # A header that held no valid code reaches payto as None; keep the
+            # raw value so the status can say "invalid" rather than "none".
+            sent = code or self._raw_from(source)
         pt = payto.payto_for_request(
             code,
             seller_payout=self.seller_payout,
             builder_share_bps=self.builder_share_bps,
             rpc_url=self.rpc_url,
         )
+        if not code and (sent or "").strip():
+            pt = dataclasses.replace(pt, status=payto.STATUS_INVALID)
         if pt.error:
             log.warning("payTo resolve failed for %r, unsplit: %s", code, pt.error)
         return pt
@@ -169,6 +178,30 @@ class Affiliation:
         if hasattr(source, "get"):
             return payto.builder_code_from_headers(source)
         return None
+
+    def _raw_from(self, source) -> Optional[str]:
+        """The raw ``X-Builder-Code`` value as sent, before validation (or None).
+
+        Only feeds the ``invalid`` status, so like :meth:`_code_from` it fails
+        open to None on anything unexpected.
+        """
+        try:
+            if isinstance(source, str):
+                return source
+            adapter = getattr(source, "adapter", None)
+            if adapter is not None and hasattr(adapter, "get_header"):
+                raw = adapter.get_header(self.HEADER)
+            elif hasattr(source, "get"):
+                raw = source.get(self.HEADER)
+                if raw is None:
+                    raw = source.get(self.HEADER.lower()) or source.get(
+                        "HTTP_X_BUILDER_CODE"
+                    )
+            else:
+                return None
+        except Exception:  # noqa: BLE001 - status is advisory, never break the 402
+            return None
+        return raw if isinstance(raw, str) else None
 
     @staticmethod
     def clear_cache() -> None:

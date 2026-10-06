@@ -242,3 +242,55 @@ def test_resolve_failure_falls_back_and_logs(monkeypatch, caplog):
     assert pt.attributed is False
     assert pt.error is not None
     assert any("resolve failed" in r.message for r in caplog.records)
+
+
+# ── status: how the submitted code resolved (X-Builder-Code-Status) ───────────
+
+def test_status_none_when_no_code_sent():
+    aff = _aff()
+    assert aff.resolve(None).status == "none"
+    assert aff.resolve({Affiliation.HEADER: ""}).status == "none"
+    assert aff.resolve(_FakeCtx(None)).status == "none"
+
+
+def test_status_invalid_when_header_holds_no_valid_code():
+    # A typo'd header must not look the same as sending nothing.
+    aff = _aff()
+    for source in ({Affiliation.HEADER: "BC-Alice!"}, _FakeCtx("not a code"), "BAD!"):
+        pt = aff.resolve(source)
+        assert pt.status == "invalid"
+        assert pt.address == SELLER
+    assert aff.resolve(code="BAD!").status == "invalid"
+
+
+def test_status_invalid_is_offline_and_fails_open_on_broken_adapter():
+    aff = _aff()
+    assert aff.resolve(_BoomCtx()).status == "none"
+
+
+def test_status_resolved_for_registered_code(monkeypatch):
+    _patch_registered(monkeypatch)
+    pt = _aff().resolve(_FakeCtx("bc_alice"))
+    assert pt.status == "resolved"
+    assert Affiliation.STATUS_HEADER == "X-Builder-Code-Status"
+
+
+def test_status_unregistered_for_unminted_code(monkeypatch):
+    monkeypatch.setattr(
+        resolver, "resolve",
+        lambda code, **kw: {"code": code, "registered": False,
+                            "owner": None, "payout_address": None},
+    )
+    aff = _aff()
+    pt = aff.resolve(_FakeCtx("bc_unminted"))
+    assert (pt.status, pt.address, pt.attributed) == ("unregistered", SELLER, False)
+    # Served from the short-TTL negative cache on repeat: same status.
+    assert aff.resolve(_FakeCtx("bc_unminted")).status == "unregistered"
+
+
+def test_status_error_when_lookup_fails(monkeypatch):
+    def _boom(code, **kw):
+        raise RuntimeError("RPC 429")
+
+    monkeypatch.setattr(resolver, "resolve", _boom)
+    assert _aff().resolve(_FakeCtx("bc_alice")).status == "error"

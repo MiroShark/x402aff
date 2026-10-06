@@ -15,6 +15,7 @@ import type { PublicClient } from "viem";
 
 import {
   Affiliation,
+  STATUS_HEADER,
   discoverBuilderCodes,
   toTokenId,
   primaryCode,
@@ -508,4 +509,34 @@ test("amountsUnits sums duplicate recipients instead of overwriting", () => {
   const got = amountsUnits(p, 1_000_000n);
   assert.equal(got.get(SELLER), 999_998n);
   assert.equal(1_000_000n - 999_998n, 2n);
+});
+
+// ── status: how the submitted code resolved (X-Builder-Code-Status) ──────────
+
+test("status is none when no code was sent", async () => {
+  const a = aff(mockClient({ payout: BUILDER, deployed: false }));
+  assert.equal((await a.resolve(null)).status, "none");
+  assert.equal((await a.resolve("")).status, "none");
+  assert.equal((await a.resolve(new Headers())).status, "none");
+});
+
+test("status is invalid when the header holds no valid code (offline)", async () => {
+  // A typo'd header must not look the same as sending nothing.
+  const a = aff(mockClient({ throwRegistry: true }));
+  for (const source of ["BAD!", new Headers({ "x-builder-code": "BC-Alice!" }), { adapter: { getHeader: () => "not a code" } }]) {
+    const pt = await a.resolve(source);
+    assert.equal(pt.status, "invalid");
+    assert.equal(pt.address, SELLER);
+    assert.equal(pt.error, undefined);
+  }
+});
+
+test("status is resolved / unregistered / error per registry outcome", async () => {
+  assert.equal(STATUS_HEADER, "X-Builder-Code-Status");
+  assert.equal(Affiliation.STATUS_HEADER, STATUS_HEADER);
+  assert.equal((await aff(mockClient({ payout: BUILDER, deployed: false })).resolve("bc_alice")).status, "resolved");
+  const ghost = aff(mockClient({ payout: null }));
+  assert.equal((await ghost.resolve("bc_ghost")).status, "unregistered");
+  assert.equal((await ghost.resolve("bc_ghost")).status, "unregistered"); // negative-cache hit
+  assert.equal((await aff(mockClient({ throwRegistry: true })).resolve("bc_alice")).status, "error");
 });

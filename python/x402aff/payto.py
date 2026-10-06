@@ -43,6 +43,16 @@ from . import push_split, resolver, split
 # The header a buyer's client sets on the unpaid request. Same grammar as `s`.
 BUILDER_CODE_HEADER = "X-Builder-Code"
 
+# The response header a seller can echo so a builder sees how its code resolved.
+# Without it an unminted code, a typo'd code and a working code all produce the
+# same healthy-looking 402. Values are the ``STATUS_*`` constants below.
+STATUS_HEADER = "X-Builder-Code-Status"
+STATUS_RESOLVED = "resolved"          # registered: payTo is the per-pair split
+STATUS_UNREGISTERED = "unregistered"  # well-formed, but not minted on the registry
+STATUS_INVALID = "invalid"            # a code was sent, but none of it is valid
+STATUS_ERROR = "error"                # the registry lookup failed (RPC); retry
+STATUS_NONE = "none"                  # no code was sent
+
 # Where the unsplit remainder - and every unattributed payment - is paid.
 SELLER_PAYOUT = os.environ.get("X402_SELLER_PAYOUT", "")
 
@@ -61,6 +71,10 @@ class PayTo:
     #: a spike means the RPC is rate-limiting and builders are silently losing
     #: their cut (the public Base RPC 429s after a few calls in a row).
     error: Optional[str] = None
+    #: How the submitted code resolved, one of the ``STATUS_*`` values. Echo it
+    #: in ``STATUS_HEADER`` so a builder can assert ``resolved`` instead of
+    #: guessing from ``address``.
+    status: str = STATUS_NONE
 
 
 #: (code, seller, share_bps) → PayTo. Only *positive* (attributed) resolutions
@@ -157,7 +171,12 @@ def payto_for_request(
     code = split.primary_code(builder_code)
 
     if not code:
-        return PayTo(seller, split.build_split_plan(seller, None), False, False)
+        # Something was sent but none of it is a valid code: say so, so a typo
+        # does not look the same as sending nothing.
+        status = STATUS_INVALID if (builder_code or "").strip() else STATUS_NONE
+        return PayTo(
+            seller, split.build_split_plan(seller, None), False, False, status=status
+        )
 
     key = (code, seller, share)
     if use_cache and key in _CACHE:
@@ -166,7 +185,11 @@ def payto_for_request(
         # A recent UNREGISTERED miss short-circuits without another registry read,
         # so a repeated bogus code can't re-hit the RPC on every request.
         return PayTo(
-            seller, split.build_split_plan(seller, None, builder_code=code), False, False
+            seller,
+            split.build_split_plan(seller, None, builder_code=code),
+            False,
+            False,
+            status=STATUS_UNREGISTERED,
         )
 
     try:
@@ -183,10 +206,10 @@ def payto_for_request(
             # process life. Only positive resolutions are memoized permanently.
             if use_cache:
                 _neg_set(key)
-            return PayTo(seller, plan, False, False)
+            return PayTo(seller, plan, False, False, status=STATUS_UNREGISTERED)
 
         address, deployed = push_split.predict_split_address(plan, rpc_url=rpc_url)
-        result = PayTo(address, plan, deployed, True)
+        result = PayTo(address, plan, deployed, True, status=STATUS_RESOLVED)
         if use_cache:
             _NEG_CACHE.pop(key, None)  # a code that now resolves is no longer a miss
             _CACHE[key] = result
@@ -201,6 +224,7 @@ def payto_for_request(
             False,
             False,
             error=f"{type(exc).__name__}: {exc}",
+            status=STATUS_ERROR,
         )
 
 

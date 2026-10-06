@@ -250,6 +250,19 @@ export interface SplitPlan {
   hasBuilder: boolean;
 }
 
+/** The response header a seller can echo so a builder sees how its code
+ *  resolved. Without it an unminted code, a typo'd code and a working code all
+ *  produce the same healthy-looking 402. Mirrors the Python kit's STATUS_HEADER. */
+export const STATUS_HEADER = "X-Builder-Code-Status";
+
+/** How the submitted builder code resolved:
+ *  - `resolved`: registered, `payTo` is the per-pair split
+ *  - `unregistered`: well-formed, but not minted on the registry
+ *  - `invalid`: a code was sent, but none of it is valid
+ *  - `error`: the registry lookup failed (RPC); retry
+ *  - `none`: no code was sent */
+export type BuilderCodeStatus = "resolved" | "unregistered" | "invalid" | "error" | "none";
+
 export interface PayTo {
   /** The address to advertise as the route's `payTo`. */
   address: Address;
@@ -259,6 +272,9 @@ export interface PayTo {
   plan: SplitPlan;
   /** Set only when a lookup *failed* (vs. finding no builder) - watch for RPC 429s. */
   error?: string;
+  /** How the submitted code resolved. Echo it in {@link STATUS_HEADER} so a
+   *  builder can assert `resolved` instead of guessing from `address`. */
+  status: BuilderCodeStatus;
 }
 
 export interface DistributeCall {
@@ -526,6 +542,8 @@ export async function discoverBuilderCodes(query: CdpQuery, appCode: string, day
 export class Affiliation {
   /** The request header a buyer's client sets to name its builder. */
   static readonly HEADER = "X-Builder-Code";
+  /** The response header to echo `PayTo.status` in (see {@link resolve}). */
+  static readonly STATUS_HEADER = STATUS_HEADER;
 
   readonly appCode: string;
   readonly sellerPayout: Address;
@@ -609,8 +627,8 @@ export class Affiliation {
 
   /** Full PayTo (address + why) for a request. Never throws. */
   async resolve(source: PayToSource): Promise<PayTo> {
-    const code =
-      source == null || typeof source === "string" ? primaryCode(source ?? null) : this.codeFromHeaders(source);
+    const raw = source == null || typeof source === "string" ? (source ?? null) : getHeader(source, Affiliation.HEADER);
+    const code = primaryCode(raw);
 
     if (!code) {
       return {
@@ -618,6 +636,9 @@ export class Affiliation {
         attributed: false,
         splitDeployed: false,
         plan: buildSplitPlan(this.sellerPayout, null, null, this.builderShareBps),
+        // Something was sent but none of it is a valid code: say so, so a typo
+        // does not look the same as sending nothing.
+        status: raw?.trim() ? "invalid" : "none",
       };
     }
 
@@ -632,6 +653,7 @@ export class Affiliation {
         attributed: false,
         splitDeployed: false,
         plan: buildSplitPlan(this.sellerPayout, null, code, this.builderShareBps),
+        status: "unregistered",
       };
     }
 
@@ -645,10 +667,10 @@ export class Affiliation {
         // whole process life. Only positive resolutions (immutable: registered
         // payout + CREATE2 address) are memoized permanently.
         this.negCacheSet(key);
-        return { address: this.sellerPayout, attributed: false, splitDeployed: false, plan };
+        return { address: this.sellerPayout, attributed: false, splitDeployed: false, plan, status: "unregistered" };
       }
       const [address, deployed] = await this.predictSplitAddress(plan);
-      const pt: PayTo = { address, attributed: true, splitDeployed: deployed, plan };
+      const pt: PayTo = { address, attributed: true, splitDeployed: deployed, plan, status: "resolved" };
       this.negCache.delete(key); // a code that now resolves is no longer a miss
       this.cache.set(key, pt);
       return pt;
@@ -662,6 +684,7 @@ export class Affiliation {
         splitDeployed: false,
         plan: buildSplitPlan(this.sellerPayout, null, code, this.builderShareBps),
         error: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
+        status: "error",
       };
     }
   }
