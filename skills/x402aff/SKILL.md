@@ -21,6 +21,7 @@ No private key, custom facilitator, or contract of your own is involved.
 2. Install the SDK.
 3. Wire `Affiliation` into the x402 route: `payTo` from the facade, and its `extensions` to declare your `a` code.
 4. Set `X402_BASE_RPC` to a paid Base RPC. The public RPC rate-limits, and a failed resolve silently falls back to the seller's wallet, unsplit.
+5. Echo `resolve(...).status` in the `X-Builder-Code-Status` response header (`STATUS_HEADER`). Values: `resolved`, `unregistered`, `invalid`, `error`, `none`. Without it a builder cannot tell a working code from an unminted or mistyped one.
 
 ### TypeScript (Node, with viem as a peer dependency)
 
@@ -67,6 +68,8 @@ extensions: [builderCode("bc_alice")]
 
 TypeScript uses the official `@x402/extensions/builder-code`. Python ships `BuilderCodeClientExtension` in `x402aff.buyer_client`.
 
+Builders: check that `X-Builder-Code-Status` on the seller's 402 says `resolved`. A code shown on base.dev earns only once it is minted on the registry; check with `cast call 0x000000BC7E6457e610fe52Dcc0ca5b3ce59C8E80 'isRegistered(string)(bool)' bc_alice`.
+
 ## Options
 
 - Builder share: `X402_BUILDER_SHARE_BPS` (both SDKs), or `builderShareBps` (TypeScript) / `builder_share_bps` (Python). Basis points, default 1000 (10%), range 0 to 10000. The ratio is baked into the split address, so a new ratio opens new splits and old funds stay at the old ratio.
@@ -85,6 +88,7 @@ TypeScript uses the official `@x402/extensions/builder-code`. Python ships `Buil
 - `payTo` is deterministic per request, so the 402 and the buyer's signed retry agree.
 - The facilitator is CDP on Base mainnet.
 - `X402_BASE_RPC` points at a paid RPC.
+- The 402 echoes `X-Builder-Code-Status`, and a request with a known registered code returns `resolved`.
 
 ## References
 

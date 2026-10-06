@@ -222,6 +222,11 @@ Three view-calls against two contracts - port
   mainnet, and attribution is written by the CDP facilitator.
 - **Use a paid RPC.** Set `X402_BASE_RPC` - the public one `429`s, and a failed
   resolve silently falls back to your wallet (unsplit).
+- **Tell builders how their code resolved.** Echo `PayTo.status` (`resolved`,
+  `unregistered`, `invalid`, `error`, `none`) in the `X-Builder-Code-Status`
+  response header (`STATUS_HEADER`). Without it, an unminted or mistyped code
+  looks exactly like a working one. A code shown on base.dev only resolves once
+  it is minted on the registry (`isRegistered(string)` returns `true`).
 - **Distribute costs a few cents of gas** (the buyer's payment is gasless). Payouts
   land ~2 base units light: a split keeps 1 unit warm and floors each share.
 - **`s` is a self-asserted tag**, not signed proof of who drove a payment. Resolving

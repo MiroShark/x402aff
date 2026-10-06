@@ -30,6 +30,7 @@ from .builder_code import (
     normalize_service_codes,
     parse_builder_code_suffix,
 )
+from .payto import STATUS_HEADER
 from .push_split import BUILDER_SHARE_BPS, USDC_BASE, predict_split_address
 from .resolver import BUILDER_CODES_REGISTRY
 
@@ -38,6 +39,7 @@ __all__ = [
     "AFFILIATION_MARKER",
     "BUILDER_CODES_REGISTRY",
     "BUILDER_SHARE_BPS",
+    "STATUS_HEADER",
     "USDC_BASE",
     "declare_builder_code",
     "marked_service_codes",
