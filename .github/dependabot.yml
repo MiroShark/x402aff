@@ -15,6 +15,11 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # Keep types at the lowest Node line CI tests (engines >=20, CI on 22/24)
+      - dependency-name: "@types/node"
+        update-types:
+          - version-update:semver-major
     groups:
       npm-minor-patch:
         update-types:

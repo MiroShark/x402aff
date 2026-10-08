@@ -128,8 +128,7 @@ jobs:
         with:
           node-version: "24"
           registry-url: https://registry.npmjs.org
-          cache: npm
-          cache-dependency-path: ts/package-lock.json
+          package-manager-cache: false # no shared cache in the OIDC publish job
       - run: npm ci
         working-directory: ts
       - id: version
