@@ -45,7 +45,7 @@ jobs:
             node-version: "24"
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
       - run: pip install -e '.[dev]' build twine
@@ -80,7 +80,7 @@ jobs:
       id-token: write # trusted publishing
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
       - run: pip install -e '.[dev]' build twine
