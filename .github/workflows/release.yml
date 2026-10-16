@@ -35,7 +35,7 @@ jobs:
   # ceilings ci.yml checks (Python 3.9/3.13, Node 22/24) and the package job's
   # build + registry-metadata validation.
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository_owner == 'MiroShark' && 'blacksmith-2vcpu-ubuntu-2404' || 'ubuntu-latest' }}
     strategy:
       matrix:
         include:
@@ -74,7 +74,7 @@ jobs:
   pypi:
     needs: [test]
     if: ${{ github.event_name == 'push' || inputs.target == 'both' || inputs.target == 'pypi' }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository_owner == 'MiroShark' && 'blacksmith-2vcpu-ubuntu-2404' || 'ubuntu-latest' }}
     environment: pypi
     permissions:
       id-token: write # trusted publishing
@@ -118,7 +118,7 @@ jobs:
   npm:
     needs: [test]
     if: ${{ github.event_name == 'push' || inputs.target == 'both' || inputs.target == 'npm' }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository_owner == 'MiroShark' && 'blacksmith-2vcpu-ubuntu-2404' || 'ubuntu-latest' }}
     permissions:
       contents: read
       id-token: write # provenance attestation
