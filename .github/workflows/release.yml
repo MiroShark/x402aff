@@ -74,7 +74,9 @@ jobs:
   pypi:
     needs: [test]
     if: ${{ github.event_name == 'push' || inputs.target == 'both' || inputs.target == 'pypi' }}
-    runs-on: ${{ github.repository_owner == 'MiroShark' && 'blacksmith-2vcpu-ubuntu-2404' || 'ubuntu-latest' }}
+    # Publish jobs stay on GitHub-hosted runners: npm trusted publishing does
+    # not support self-hosted runners (Blacksmith counts as one).
+    runs-on: ubuntu-latest
     environment: pypi
     permissions:
       id-token: write # trusted publishing
@@ -118,7 +120,8 @@ jobs:
   npm:
     needs: [test]
     if: ${{ github.event_name == 'push' || inputs.target == 'both' || inputs.target == 'npm' }}
-    runs-on: ${{ github.repository_owner == 'MiroShark' && 'blacksmith-2vcpu-ubuntu-2404' || 'ubuntu-latest' }}
+    # GitHub-hosted on purpose, see the pypi job.
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write # provenance attestation
