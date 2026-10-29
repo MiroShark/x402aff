@@ -49,6 +49,7 @@ BUILDER_CODE_HEADER = "X-Builder-Code"
 STATUS_HEADER = "X-Builder-Code-Status"
 STATUS_RESOLVED = "resolved"          # registered: payTo is the per-pair split
 STATUS_UNREGISTERED = "unregistered"  # well-formed, but not minted on the registry
+STATUS_BLOCKED = "blocked"            # registered, but USDC refuses its payout
 STATUS_INVALID = "invalid"            # a code was sent, but none of it is valid
 STATUS_ERROR = "error"                # the registry lookup failed (RPC); retry
 STATUS_NONE = "none"                  # no code was sent
@@ -96,23 +97,28 @@ _CACHE: dict[tuple[str, str, int], PayTo] = {}
 #: retries next request instead of being stranded for the TTL. The TTL is short
 #: so a builder who registers just after their first request is stranded for at
 #: most that window; the cap keeps the cache itself from being an amp vector.
-_NEG_CACHE: dict[tuple[str, str, int], float] = {}
+#: A BLOCKED code (payout USDC refuses) is held here the same way, with its
+#: status, so the builder sees the right reason and a fixed payout is picked up
+#: after the TTL.
+_NEG_CACHE: dict[tuple[str, str, int], tuple[float, str]] = {}
 NEG_CACHE_TTL_S = 60.0
 NEG_CACHE_MAX = 1024
 
 
-def _neg_hit(key: tuple[str, str, int]) -> bool:
-    """True if `key` has a live negative entry (expired entries swept lazily)."""
-    exp = _NEG_CACHE.get(key)
-    if exp is None:
-        return False
+def _neg_hit(key: tuple[str, str, int]) -> Optional[str]:
+    """The cached status if `key` has a live negative entry, else None (expired
+    entries swept lazily)."""
+    entry = _NEG_CACHE.get(key)
+    if entry is None:
+        return None
+    exp, status = entry
     if exp <= time.monotonic():
         _NEG_CACHE.pop(key, None)
-        return False
-    return True
+        return None
+    return status
 
 
-def _neg_set(key: tuple[str, str, int]) -> None:
+def _neg_set(key: tuple[str, str, int], status: str = STATUS_UNREGISTERED) -> None:
     """Record a short-TTL miss, evicting the oldest when full. Refresh moves the
     key to the end (dicts keep insertion order), so eviction drops the oldest."""
     _NEG_CACHE.pop(key, None)
@@ -120,7 +126,7 @@ def _neg_set(key: tuple[str, str, int]) -> None:
         oldest = next(iter(_NEG_CACHE), None)
         if oldest is not None:
             _NEG_CACHE.pop(oldest, None)
-    _NEG_CACHE[key] = time.monotonic() + NEG_CACHE_TTL_S
+    _NEG_CACHE[key] = (time.monotonic() + NEG_CACHE_TTL_S, status)
 
 
 def builder_code_from_headers(headers) -> Optional[str]:
@@ -159,8 +165,8 @@ def payto_for_request(
 ) -> PayTo:
     """Resolve the ``payTo`` for one 402. Never raises.
 
-    No code, an unregistered code, or a failed lookup all yield the seller's own
-    wallet - the payment still works, it just isn't split.
+    No code, an unregistered code, a payout USDC refuses, or a failed lookup all
+    yield the seller's own wallet - the payment still works, it just isn't split.
     """
     seller = seller_payout or SELLER_PAYOUT
     if not seller:
@@ -181,16 +187,14 @@ def payto_for_request(
     key = (code, seller, share)
     if use_cache and key in _CACHE:
         return _CACHE[key]
-    if use_cache and _neg_hit(key):
-        # A recent UNREGISTERED miss short-circuits without another registry read,
-        # so a repeated bogus code can't re-hit the RPC on every request.
-        return PayTo(
-            seller,
-            split.build_split_plan(seller, None, builder_code=code),
-            False,
-            False,
-            status=STATUS_UNREGISTERED,
-        )
+    neg_status = _neg_hit(key) if use_cache else None
+    if neg_status:
+        # A recent UNREGISTERED (or BLOCKED) miss short-circuits without another
+        # registry read, so a repeated bogus code can't re-hit the RPC on every
+        # request.
+        plan = split.build_split_plan(seller, None, builder_code=code)
+        plan.payout_blocked = neg_status == STATUS_BLOCKED
+        return PayTo(seller, plan, False, False, status=neg_status)
 
     try:
         plan = split.resolve_and_plan(
@@ -204,9 +208,12 @@ def payto_for_request(
             # short-TTL negative cache (not `_CACHE`): the builder may register
             # later, and a lasting miss would strand their cut for the whole
             # process life. Only positive resolutions are memoized permanently.
+            # A blocked payout (USDC refuses it) lands here too: the seller is
+            # paid in full rather than into a split that could never pay out.
+            status = STATUS_BLOCKED if plan.payout_blocked else STATUS_UNREGISTERED
             if use_cache:
-                _neg_set(key)
-            return PayTo(seller, plan, False, False, status=STATUS_UNREGISTERED)
+                _neg_set(key, status)
+            return PayTo(seller, plan, False, False, status=status)
 
         address, deployed = push_split.predict_split_address(plan, rpc_url=rpc_url)
         result = PayTo(address, plan, deployed, True, status=STATUS_RESOLVED)

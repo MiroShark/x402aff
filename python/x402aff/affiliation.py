@@ -34,6 +34,7 @@ actually use CDP-index discovery.
 """
 from __future__ import annotations
 
+import asyncio
 import dataclasses
 import logging
 from typing import TYPE_CHECKING, Any, Optional
@@ -122,8 +123,17 @@ class Affiliation:
         Pass as ``PaymentOption(pay_to=aff.pay_to)``. Reads ``X-Builder-Code`` off
         the request context and returns the per-pair split address, or the seller
         wallet when there's no/unknown/unresolvable code.
+
+        The resolve does blocking RPC reads (``requests``), so it runs in a worker
+        thread: on the event loop a slow or rate-limited RPC would stall every
+        other request the server is handling. The header is read here first, on
+        the loop, so the request object never crosses threads.
         """
-        return self.resolve(ctx).address
+        code = self._code_from(ctx)
+        if not code:
+            return self.resolve(ctx).address  # no code: no RPC, nothing to offload
+        pt = await asyncio.to_thread(self.resolve, code=code)
+        return pt.address
 
     def pay_to_for(self, source=None, *, code: Optional[str] = None) -> str:
         """Sync ``payTo`` for a request - for stacks where you set it yourself.

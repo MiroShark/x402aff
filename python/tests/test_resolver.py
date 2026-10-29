@@ -117,6 +117,51 @@ def test_registered_code_returns_owner_and_payout(monkeypatch):
     assert info["code"] == CODE
 
 
+def test_resolve_flags_a_blacklisted_payout(monkeypatch):
+    owner_word = _word("0x" + "a" * 40)
+    true_word = "0x" + "0" * 63 + "1"
+    monkeypatch.setattr(resolver.requests, "post",
+                        _post_returning({"result": owner_word}, {"result": _word(PAYOUT)},
+                                        {"result": true_word}))
+    info = resolver.resolve(CODE)
+    assert info["registered"] is True and info["payout_address"] == PAYOUT
+    assert info["payout_blocked"] is True
+
+
+# ── payout screen ─────────────────────────────────────────────────────────────
+
+def test_payout_blocked_asks_usdc_isblacklisted(monkeypatch):
+    seen = {}
+
+    def _post(url, json, timeout):
+        seen.update(json["params"][0])
+        return _Resp({"result": "0x" + "0" * 64})
+
+    monkeypatch.setattr(resolver.requests, "post", _post)
+    assert resolver.payout_blocked(PAYOUT) is False
+    assert seen["to"] == resolver.USDC_BASE
+    assert seen["data"] == "0xfe575a87" + "0" * 24 + PAYOUT[2:]
+
+
+def test_usdc_and_zero_are_blocked_without_rpc(monkeypatch):
+    monkeypatch.setattr(resolver.requests, "post", lambda *a, **k: pytest.fail("no RPC expected"))
+    assert resolver.payout_blocked(resolver.USDC_BASE) is True
+    assert resolver.payout_blocked(resolver.USDC_BASE.lower()) is True
+    assert resolver.payout_blocked("0x" + "0" * 40) is True
+
+
+def test_payout_screen_failure_raises(monkeypatch):
+    # Neither "blocked" nor "fine" is safe to guess: raise, and payto pays the
+    # seller unsplit with the error recorded.
+    monkeypatch.setattr(resolver.requests, "post",
+                        _post_returning({"error": {"code": -32005, "message": "limit exceeded"}}))
+    with pytest.raises(RuntimeError, match="USDC isBlacklisted eth_call failed"):
+        resolver.payout_blocked(PAYOUT)
+    monkeypatch.setattr(resolver.requests, "post", _post_returning({"result": "0x"}))
+    with pytest.raises(RuntimeError, match="no data"):
+        resolver.payout_blocked(PAYOUT)
+
+
 def test_zero_owner_word_means_unregistered(monkeypatch):
     monkeypatch.setattr(resolver.requests, "post", _post_returning({"result": _word("0x" + "0" * 40)}))
     assert resolver.resolve(CODE)["registered"] is False

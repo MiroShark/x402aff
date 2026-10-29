@@ -48,7 +48,7 @@ calls, balance = aff.release("bc_alice")
 ```
 
 `aff.resolve(request)` returns the full `PayTo`, including `status`
-(`resolved` / `unregistered` / `invalid` / `error` / `none`). Echo it in the
+(`resolved` / `unregistered` / `blocked` / `invalid` / `error` / `none`). Echo it in the
 `aff.STATUS_HEADER` (`X-Builder-Code-Status`) response header so a builder can
 tell a working code from an unminted or mistyped one.
 

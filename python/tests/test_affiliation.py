@@ -161,6 +161,35 @@ def test_pay_to_async_callback_registered(monkeypatch):
     assert addr == SPLIT
 
 
+def test_pay_to_does_not_block_the_event_loop(monkeypatch):
+    # The resolve does blocking RPC reads; run on the loop, a slow RPC stalled
+    # every other request the server was handling.
+    import time
+
+    from x402aff import payto, split
+
+    plan = split.build_split_plan(SELLER, BUILDER, builder_code="bc_alice")
+
+    def _slow(code, **kw):
+        time.sleep(0.3)
+        return payto.PayTo(SPLIT, plan, False, True, status=payto.STATUS_RESOLVED)
+
+    monkeypatch.setattr(payto, "payto_for_request", _slow)
+    aff = _aff()
+
+    async def main():
+        task = asyncio.create_task(aff.pay_to(_FakeCtx("bc_alice")))
+        ticks = 0
+        while not task.done():
+            await asyncio.sleep(0.01)
+            ticks += 1
+        return await task, ticks
+
+    addr, ticks = asyncio.run(main())
+    assert addr == SPLIT
+    assert ticks >= 5, "the loop kept serving while the resolve ran"
+
+
 def test_balance_reads_split(monkeypatch):
     _patch_registered(monkeypatch, balance=12_400_000)
     assert _aff().balance("bc_alice") == 12_400_000
