@@ -214,6 +214,14 @@ const ERC20_ABI = [
     inputs: [{ type: "address" }],
     outputs: [{ type: "uint256" }],
   },
+  {
+    // Circle FiatToken (USDC): true for an address USDC refuses to pay.
+    name: "isBlacklisted",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ type: "address" }],
+    outputs: [{ type: "bool" }],
+  },
 ] as const;
 
 // ── plain-data types ─────────────────────────────────────────────────────────
@@ -258,10 +266,11 @@ export const STATUS_HEADER = "X-Builder-Code-Status";
 /** How the submitted builder code resolved:
  *  - `resolved`: registered, `payTo` is the per-pair split
  *  - `unregistered`: well-formed, but not minted on the registry
+ *  - `blocked`: registered, but USDC refuses its payout, so the seller is paid in full
  *  - `invalid`: a code was sent, but none of it is valid
  *  - `error`: the registry lookup failed (RPC); retry
  *  - `none`: no code was sent */
-export type BuilderCodeStatus = "resolved" | "unregistered" | "invalid" | "error" | "none";
+export type BuilderCodeStatus = "resolved" | "unregistered" | "blocked" | "invalid" | "error" | "none";
 
 export interface PayTo {
   /** The address to advertise as the route's `payTo`. */
@@ -553,9 +562,10 @@ export class Affiliation {
    *  unregistered code and a lookup error are never cached, so a builder who
    *  registers after their first request isn't stranded on a stale miss. */
   private readonly cache = new Map<string, PayTo>();
-  /** code|bps → expiry-ms for NEGATIVE (unregistered) resolutions. Short-lived
-   *  and size-capped - see NEG_CACHE_TTL_MS / NEG_CACHE_MAX. */
-  private readonly negCache = new Map<string, number>();
+  /** code|bps → expiry-ms + status for NEGATIVE (unregistered or blocked)
+   *  resolutions. Short-lived and size-capped - see NEG_CACHE_TTL_MS /
+   *  NEG_CACHE_MAX. */
+  private readonly negCache = new Map<string, { exp: number; status: BuilderCodeStatus }>();
   private _extensions?: Record<string, unknown>;
 
   constructor(opts: AffiliationOptions) {
@@ -645,29 +655,36 @@ export class Affiliation {
     const key = `${code}|${this.builderShareBps}`;
     const cached = this.cache.get(key);
     if (cached) return cached;
-    // A recent UNREGISTERED miss short-circuits without another registry read,
-    // so a repeated bogus code can't re-hit the RPC on every request.
-    if (this.negCacheHit(key)) {
+    // A recent UNREGISTERED (or BLOCKED) miss short-circuits without another
+    // registry read, so a repeated bogus code can't re-hit the RPC on every request.
+    const negStatus = this.negCacheHit(key);
+    if (negStatus) {
       return {
         address: this.sellerPayout,
         attributed: false,
         splitDeployed: false,
         plan: buildSplitPlan(this.sellerPayout, null, code, this.builderShareBps),
-        status: "unregistered",
+        status: negStatus,
       };
     }
 
     try {
       const payout = await this.payoutOf(code);
-      const plan = buildSplitPlan(this.sellerPayout, payout, code, this.builderShareBps);
+      // A payout USDC refuses never goes into a split: the split is ownerless and
+      // pays every recipient in one distribute, so it would never pay out and
+      // every payment in it, the seller's share too, would be stuck for good.
+      const blocked = payout !== null && (await this.payoutBlocked(payout));
+      const plan = buildSplitPlan(this.sellerPayout, blocked ? null : payout, code, this.builderShareBps);
       if (!plan.hasBuilder) {
-        // Resolved fine, but this code isn't registered *yet*. Held only in the
-        // short-TTL negative cache (not the permanent one): the builder may
-        // register later, and a lasting miss would strand their cut for the
-        // whole process life. Only positive resolutions (immutable: registered
-        // payout + CREATE2 address) are memoized permanently.
-        this.negCacheSet(key);
-        return { address: this.sellerPayout, attributed: false, splitDeployed: false, plan, status: "unregistered" };
+        // Resolved fine, but this code isn't registered *yet* (or its payout is
+        // blocked). Held only in the short-TTL negative cache (not the permanent
+        // one): the builder may register or fix the payout later, and a lasting
+        // miss would strand their cut for the whole process life. Only positive
+        // resolutions (registered payout + CREATE2 address) are memoized
+        // permanently.
+        const status: BuilderCodeStatus = blocked ? "blocked" : "unregistered";
+        this.negCacheSet(key, status);
+        return { address: this.sellerPayout, attributed: false, splitDeployed: false, plan, status };
       }
       const [address, deployed] = await this.predictSplitAddress(plan);
       const pt: PayTo = { address, attributed: true, splitDeployed: deployed, plan, status: "resolved" };
@@ -696,27 +713,28 @@ export class Affiliation {
     this.negCache.clear();
   }
 
-  /** True if `key` has a live negative entry (expired entries are swept lazily). */
-  private negCacheHit(key: string): boolean {
-    const exp = this.negCache.get(key);
-    if (exp === undefined) return false;
-    if (exp <= nowMs()) {
+  /** The cached status if `key` has a live negative entry, else null (expired
+   *  entries are swept lazily). */
+  private negCacheHit(key: string): BuilderCodeStatus | null {
+    const entry = this.negCache.get(key);
+    if (entry === undefined) return null;
+    if (entry.exp <= nowMs()) {
       this.negCache.delete(key);
-      return false;
+      return null;
     }
-    return true;
+    return entry.status;
   }
 
   /** Record a short-TTL miss for `key`, evicting the oldest when full. Delete-
    *  then-set moves a refreshed key to the end (Map keeps insertion order), so
    *  eviction drops the genuinely oldest miss. */
-  private negCacheSet(key: string): void {
+  private negCacheSet(key: string, status: BuilderCodeStatus): void {
     this.negCache.delete(key);
     if (this.negCache.size >= NEG_CACHE_MAX) {
       const oldest = this.negCache.keys().next().value;
       if (oldest !== undefined) this.negCache.delete(oldest);
     }
-    this.negCache.set(key, nowMs() + NEG_CACHE_TTL_MS);
+    this.negCache.set(key, { exp: nowMs() + NEG_CACHE_TTL_MS, status });
   }
 
   // ── payout path ────────────────────────────────────────────────────────────
@@ -833,6 +851,21 @@ export class Affiliation {
       if (isUnregistered(err)) return null;
       throw err;
     }
+  }
+
+  /** Would USDC refuse to pay `address`? True for the zero address, the USDC
+   *  contract itself, and anything USDC reports as blacklisted - none of them
+   *  may go into a split. Rethrows on network error (the caller then pays the
+   *  seller unsplit and reports it). Mirrors the Python kit's
+   *  resolver.payout_blocked. */
+  async payoutBlocked(address: Address): Promise<boolean> {
+    if (BigInt(address) === 0n || address.toLowerCase() === USDC_BASE.toLowerCase()) return true;
+    return await this.client.readContract({
+      address: USDC_BASE,
+      abi: ERC20_ABI,
+      functionName: "isBlacklisted",
+      args: [address],
+    });
   }
 
   /** The pair's counterfactual PushSplit address + whether it's deployed yet. */

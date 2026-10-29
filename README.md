@@ -223,7 +223,7 @@ Three view-calls against two contracts - port
 - **Use a paid RPC.** Set `X402_BASE_RPC` - the public one `429`s, and a failed
   resolve silently falls back to your wallet (unsplit).
 - **Tell builders how their code resolved.** Echo `PayTo.status` (`resolved`,
-  `unregistered`, `invalid`, `error`, `none`) in the `X-Builder-Code-Status`
+  `unregistered`, `blocked`, `invalid`, `error`, `none`) in the `X-Builder-Code-Status`
   response header (`STATUS_HEADER`). Without it, an unminted or mistyped code
   looks exactly like a working one. A code shown on base.dev only resolves once
   it is minted on the registry (`isRegistered(string)` returns `true`).
@@ -259,6 +259,9 @@ on-chain attack surface, and the money is held by code that is already audited.
   Every split is created **ownerless** (`owner = 0`) and immutable.
 - **Base Builder Codes registry** (`0x000000BC…C8E80`) maps a code to the payout its
   owner registered. Read-only, so a builder's cut can only go where that builder said.
+  The kit screens that payout first: a split to the USDC contract, or to an address
+  USDC has blacklisted, could never pay out, so such a code pays you in full instead
+  (status `blocked`).
 
 ### What the split guarantees - proven against live mainnet
 

@@ -21,7 +21,7 @@ No private key, custom facilitator, or contract of your own is involved.
 2. Install the SDK.
 3. Wire `Affiliation` into the x402 route: `payTo` from the facade, and its `extensions` to declare your `a` code.
 4. Set `X402_BASE_RPC` to a paid Base RPC. The public RPC rate-limits, and a failed resolve silently falls back to the seller's wallet, unsplit.
-5. Echo `resolve(...).status` in the `X-Builder-Code-Status` response header (`STATUS_HEADER`). Values: `resolved`, `unregistered`, `invalid`, `error`, `none`. Without it a builder cannot tell a working code from an unminted or mistyped one.
+5. Echo `resolve(...).status` in the `X-Builder-Code-Status` response header (`STATUS_HEADER`). Values: `resolved`, `unregistered`, `blocked` (registered, but USDC refuses its payout, so the seller is paid in full), `invalid`, `error`, `none`. Without it a builder cannot tell a working code from an unminted or mistyped one.
 
 ### TypeScript (Node, with viem as a peer dependency)
 

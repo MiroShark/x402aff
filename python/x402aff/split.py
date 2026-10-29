@@ -52,6 +52,10 @@ class SplitPlan:
     builder_payout: Optional[str]
     builder_share_bps: int
     recipients: list[tuple[str, int]]
+    #: The code is registered, but its payout is one USDC refuses (see
+    #: ``resolver.payout_blocked``), so the builder leg was dropped: a split
+    #: holding that recipient could never distribute.
+    payout_blocked: bool = False
 
     @property
     def has_builder(self) -> bool:
@@ -217,16 +221,25 @@ def resolve_and_plan(
     ``s_code`` may be comma-joined (layered clients); the split pays the *primary*
     (first valid) code - the single-``s`` v1 policy. An unregistered or missing
     code yields a seller-only plan, so a bad/absent ``s`` never blocks settlement.
+    So does a registered code whose payout USDC refuses (``payout_blocked``):
+    splitting to it would leave every payment, the seller's share too, stuck in
+    an ownerless split that can never distribute.
     """
     code = primary_code(s_code)
     payout: Optional[str] = None
+    blocked = False
     if code:
         info = resolver.resolve(code, rpc_url=rpc_url)
         if info.get("registered"):
-            payout = info.get("payout_address")
-    return build_split_plan(
+            if info.get("payout_blocked"):
+                blocked = True
+            else:
+                payout = info.get("payout_address")
+    plan = build_split_plan(
         seller_payout, payout, builder_code=code, builder_share_bps=builder_share_bps
     )
+    plan.payout_blocked = blocked
+    return plan
 
 
 def primary_code(s_code: Optional[str]) -> Optional[str]:

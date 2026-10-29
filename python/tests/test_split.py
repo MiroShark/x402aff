@@ -144,6 +144,22 @@ def test_resolve_and_plan_unregistered_falls_back_to_seller(monkeypatch):
     plan = split.resolve_and_plan("bc_ghost", SELLER)
     assert not plan.has_builder
     assert plan.recipients == [(SELLER, split.BPS_DENOM)]
+    assert not plan.payout_blocked
+
+
+def test_resolve_and_plan_drops_a_blocked_payout(monkeypatch):
+    # Registered, but USDC refuses the payout: a split to it could never
+    # distribute, so the seller is paid in full instead.
+    monkeypatch.setattr(
+        split.resolver,
+        "resolve",
+        lambda code, **kw: {"registered": True, "payout_address": BUILDER,
+                            "payout_blocked": True},
+    )
+    plan = split.resolve_and_plan("bc_alice", SELLER)
+    assert not plan.has_builder
+    assert plan.recipients == [(SELLER, split.BPS_DENOM)]
+    assert plan.payout_blocked and plan.builder_code == "bc_alice"
 
 
 def test_resolve_and_plan_no_code_is_seller_only(monkeypatch):

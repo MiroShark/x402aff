@@ -32,7 +32,7 @@ log = logging.getLogger("x402aff.push_split")
 _CHECKSUM_WARNED = False
 
 # ── Base mainnet addresses ────────────────────────────────────────────────────
-USDC_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+USDC_BASE = resolver.USDC_BASE  # one definition, shared with the payout screen
 # 0xSplits PushSplitFactory V2.2 on Base - confirmed by the Splits team
 # (2026-07-15) and verified on-chain (Basescan: "PushSplitFactory", 0xSplits).
 # Canonical list: https://splits.org/protocol/docs/core/split-v2#addresses

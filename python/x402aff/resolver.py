@@ -49,10 +49,16 @@ DEFAULT_RPC = "https://mainnet.base.org"
 # for the lookup whose failure silently costs the builder their cut.
 BASE_RPC = os.environ.get("X402_BASE_RPC", DEFAULT_RPC)
 
+# USDC on Base, the token every split is paid in. Defined here, not in
+# `push_split`, for the same cycle reason as BASE_RPC: the payout screen below
+# needs it. `push_split.USDC_BASE` re-exports this one.
+USDC_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+
 # 4-byte function selectors (keccak256(sig)[:4]). Hardcoded so this file needs no
 # keccak library; each is verified against the on-chain contract.
 _SEL_OWNER_OF = "6352211e"        # ownerOf(uint256)          - standard ERC-721
 _SEL_PAYOUT_BY_ID = "9b2c1793"    # payoutAddress(uint256)
+_SEL_IS_BLACKLISTED = "fe575a87"  # isBlacklisted(address)    - on USDC (Circle FiatToken)
 
 _CODE_RE = re.compile(BUILDER_CODE_PATTERN)
 
@@ -91,8 +97,10 @@ def _is_revert(error: dict) -> bool:
     return "revert" in str(error.get("message", "")).lower()
 
 
-def _eth_call(selector: str, token_id: int, rpc_url: str, timeout: float) -> str | None:
-    """Call a `(uint256)` view on the registry; return the 32-byte hex word.
+def _eth_call(selector: str, arg: int, rpc_url: str, timeout: float, *,
+              to: str = BUILDER_CODES_REGISTRY, what: str = "registry") -> str | None:
+    """Call a one-word-argument view (the registry by default); return the
+    32-byte hex word.
 
     Returns None only when the call *reverted* - i.e. the code is not registered.
     A transport or node failure raises instead, and must: collapsing an RPC 429
@@ -102,11 +110,11 @@ def _eth_call(selector: str, token_id: int, rpc_url: str, timeout: float) -> str
     still never breaks: ``payto.payto_for_request`` catches this and falls back
     to the seller, but records the error. Mirrors the TS port's isUnregistered.
     """
-    data = "0x" + selector + f"{token_id:064x}"
+    data = "0x" + selector + f"{arg:064x}"
     resp = requests.post(
         rpc_url,
         json={"jsonrpc": "2.0", "id": 1, "method": "eth_call",
-              "params": [{"to": BUILDER_CODES_REGISTRY, "data": data}, "latest"]},
+              "params": [{"to": to, "data": data}, "latest"]},
         timeout=timeout,
     )
     resp.raise_for_status()
@@ -115,7 +123,7 @@ def _eth_call(selector: str, token_id: int, rpc_url: str, timeout: float) -> str
     if error:
         if _is_revert(error):
             return None
-        raise RuntimeError(f"registry eth_call failed: {error}")
+        raise RuntimeError(f"{what} eth_call failed: {error}")
     result = body.get("result")
     # Some nodes answer a reverting view with an empty result instead of an error.
     if not result or result == "0x":
@@ -132,6 +140,28 @@ def _word_to_address(word: str | None) -> str | None:
     return None if int(addr, 16) == 0 else addr
 
 
+def payout_blocked(address: str, *, rpc_url: str = BASE_RPC, timeout: float = 20.0) -> bool:
+    """Would USDC refuse to pay ``address``? True means keep it out of a split.
+
+    A PushSplit pays every recipient in one ``distribute``, so one recipient that
+    USDC refuses makes every distribute revert. The split is ownerless, so nothing
+    can swap that recipient out: each payment in it, the seller's share included,
+    is stuck for good. The registry lets a code's owner set any non-zero payout,
+    so screen it before it goes into a split: the zero address, the USDC contract
+    itself, and any address USDC reports as blacklisted.
+
+    Raises on an RPC failure, like the registry reads, so the caller pays the
+    seller unsplit and records the error rather than guessing either way.
+    """
+    if int(address, 16) == 0 or address.lower() == USDC_BASE.lower():
+        return True
+    word = _eth_call(_SEL_IS_BLACKLISTED, int(address, 16), rpc_url, timeout,
+                     to=USDC_BASE, what="USDC isBlacklisted")
+    if word is None:
+        raise RuntimeError("USDC isBlacklisted returned no data")
+    return int(word, 16) != 0
+
+
 def resolve(code: str, *, rpc_url: str = BASE_RPC, timeout: float = 20.0) -> dict:
     """Resolve a builder code to its owner + payout address on Base.
 
@@ -141,18 +171,21 @@ def resolve(code: str, *, rpc_url: str = BASE_RPC, timeout: float = 20.0) -> dic
          "token_id": 131042744964646850211374452,
          "registered": True,
          "owner": "0xf9d7…8116",          # controls the code NFT
-         "payout_address": "0xa06c…54c8"} # where rewards go - pay this
+         "payout_address": "0xa06c…54c8", # where rewards go - pay this
+         "payout_blocked": False}         # True: USDC refuses it, never split to it
 
     ``registered`` is False (with owner/payout None) when no such code is minted.
+    ``payout_blocked`` is :func:`payout_blocked` for the payout (one more read).
     """
     token_id = to_token_id(code)
     owner = _word_to_address(_eth_call(_SEL_OWNER_OF, token_id, rpc_url, timeout))
     if owner is None:
         return {"code": code, "token_id": token_id, "registered": False,
-                "owner": None, "payout_address": None}
+                "owner": None, "payout_address": None, "payout_blocked": False}
     payout = _word_to_address(_eth_call(_SEL_PAYOUT_BY_ID, token_id, rpc_url, timeout))
+    blocked = payout is not None and payout_blocked(payout, rpc_url=rpc_url, timeout=timeout)
     return {"code": code, "token_id": token_id, "registered": True,
-            "owner": owner, "payout_address": payout}
+            "owner": owner, "payout_address": payout, "payout_blocked": blocked}
 
 
 def resolve_many(codes, *, rpc_url: str = BASE_RPC) -> dict[str, dict]:

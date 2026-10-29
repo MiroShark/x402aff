@@ -65,8 +65,8 @@ for (const c of calls) {
 falls back to `sellerPayout` (unsplit, never a failed payment). Inject a viem
 `PublicClient` via `{ client }` to share a transport or for tests.
 
-`resolve` also returns `status` (`"resolved" | "unregistered" | "invalid" |
-"error" | "none"`). Echo it so builders can tell a working code from a dead one:
+`resolve` also returns `status` (`"resolved" | "unregistered" | "blocked" |
+"invalid" | "error" | "none"`). Echo it so builders can tell a working code from a dead one:
 
 ```ts
 const pt = await aff.resolve(req.headers);

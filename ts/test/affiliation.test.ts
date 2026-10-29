@@ -38,6 +38,8 @@ import {
 const SELLER = "0x2222222222222222222222222222222222222222" as const;
 const BUILDER = "0x1111111111111111111111111111111111111111" as const;
 const SPLIT = "0x3773000000000000000000000000000000002e38" as const;
+/** isBlacklisted(address) on USDC (`cast sig`). */
+const IS_BLACKLISTED = "0xfe575a87";
 
 // isDeployed((address[],uint256[],uint256,uint16),address,bytes32) for
 // recipients [BUILDER, SELLER], allocations [1000, 9000] - generated with
@@ -78,12 +80,19 @@ function mockClient(opts: {
   deployed?: boolean;
   balance?: bigint;
   throwRegistry?: boolean;
+  /** Addresses USDC.isBlacklisted reports true for. */
+  blacklisted?: string[];
+  throwBlacklist?: boolean;
+  /** Every eth_call as `to:selector`, in order. */
+  calls?: string[];
 }): PublicClient {
   const transport = custom({
     async request({ method, params }: { method: string; params: any }) {
       if (method === "eth_chainId") return "0x2105";
       if (method !== "eth_call") throw new Error(`unexpected method ${method}`);
       const to = String(params[0].to).toLowerCase();
+      const data = String(params[0].data ?? params[0].input ?? "");
+      opts.calls?.push(`${to}:${data.slice(0, 10)}`);
       if (to === BUILDER_CODES_REGISTRY.toLowerCase()) {
         if (opts.throwRegistry) throw new Error("boom: RPC unavailable");
         if (opts.payout == null) return "0x"; // unregistered → zero-data revert
@@ -93,6 +102,12 @@ function mockClient(opts: {
         return "0x" + word(SPLIT) + uintWord(opts.deployed ? 1n : 0n);
       }
       if (to === USDC_BASE.toLowerCase()) {
+        if (data.startsWith(IS_BLACKLISTED)) {
+          if (opts.throwBlacklist) throw new Error("boom: RPC unavailable");
+          const who = "0x" + data.slice(-40);
+          const listed = (opts.blacklisted ?? []).some((a) => a.toLowerCase() === who);
+          return "0x" + uintWord(listed ? 1n : 0n);
+        }
         return "0x" + uintWord(opts.balance ?? 0n);
       }
       throw new Error(`unexpected eth_call to ${to}`);
@@ -304,6 +319,64 @@ test("a transient error is NOT negatively cached (retries on the next request)",
   const r2 = await a.resolve("bc_alice");
   assert.equal(r2.attributed, true);
   assert.equal(r2.address.toLowerCase(), SPLIT);
+});
+
+// ── payout screen ─────────────────────────────────────────────────────────────
+// A PushSplit is ownerless and pays every recipient in one distribute, so a
+// builder payout USDC refuses makes every distribute revert and strands the
+// whole payment, the seller's share too. Such a payout must never become the
+// advertised split. Same cases as python/tests/test_payto.py.
+
+const BLACKLISTED = "0x0000000000000000000000000000000000000bad";
+
+test("a good payout is screened against USDC, then routes to the split", async () => {
+  const calls: string[] = [];
+  const a = aff(mockClient({ payout: BUILDER, blacklisted: [BLACKLISTED], calls }));
+  const pt = await a.resolve("bc_alice");
+  assert.equal(pt.status, "resolved");
+  assert.equal(pt.address.toLowerCase(), SPLIT);
+  assert.ok(calls.includes(`${USDC_BASE.toLowerCase()}:${IS_BLACKLISTED}`));
+});
+
+test("a blacklisted payout pays the seller in full (status blocked)", async () => {
+  const calls: string[] = [];
+  const a = aff(mockClient({ payout: BLACKLISTED, blacklisted: [BLACKLISTED], calls }));
+  const pt = await a.resolve("bc_alice");
+  assert.equal(pt.status, "blocked");
+  assert.equal(pt.address, SELLER);
+  assert.equal(pt.attributed, false);
+  assert.equal(pt.error, undefined);
+  assert.deepEqual(pt.plan.recipients, [[SELLER, 10000]]);
+  // no split address is ever predicted for it
+  assert.ok(!calls.some((c) => c.startsWith(SPLITS_PUSH_FACTORY.toLowerCase())));
+});
+
+test("the USDC contract as payout pays the seller in full, with no RPC needed", async () => {
+  const calls: string[] = [];
+  const a = aff(mockClient({ payout: USDC_BASE, calls }));
+  const pt = await a.resolve("bc_alice");
+  assert.equal(pt.status, "blocked");
+  assert.equal(pt.address, SELLER);
+  assert.ok(!calls.some((c) => c.startsWith(USDC_BASE.toLowerCase())));
+});
+
+test("a blocked code is served from the negative cache", async () => {
+  const calls: string[] = [];
+  const a = aff(mockClient({ payout: BLACKLISTED, blacklisted: [BLACKLISTED], calls }));
+  await a.resolve("bc_alice");
+  const n = calls.length;
+  const again = await a.resolve("bc_alice");
+  assert.equal(again.status, "blocked");
+  assert.equal(again.address, SELLER);
+  assert.equal(calls.length, n, "a repeated blocked code must not re-hit the RPC");
+});
+
+test("a failed blacklist read pays the seller and reports the error", async () => {
+  const a = aff(mockClient({ payout: BUILDER, throwBlacklist: true }));
+  const pt = await a.resolve("bc_alice");
+  assert.equal(pt.status, "error");
+  assert.equal(pt.address, SELLER);
+  assert.ok(pt.error && /boom|RPC/i.test(pt.error));
 });
 
 test("builderShareBps falls back to X402_BUILDER_SHARE_BPS env, arg wins, bad values ignored", () => {

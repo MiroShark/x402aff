@@ -115,7 +115,7 @@ facade wraps the modules below.
    402 for each needs no live RPC call - the public RPC rate-limits.
 5. **Echo the status** (recommended). Set the `X-Builder-Code-Status` response
    header (`payto.STATUS_HEADER`) from `PayTo.status`: `resolved`,
-   `unregistered`, `invalid`, `error`, or `none`. Every fallback otherwise looks
+   `unregistered`, `blocked`, `invalid`, `error`, or `none`. Every fallback otherwise looks
    like a normal 402, so a builder with an unminted or mistyped code would earn
    0% without knowing. With the header it can assert `resolved` at startup.
 
@@ -196,6 +196,11 @@ exactly the right shape.
 
 - **No / unregistered / blank code** → `payTo` = your wallet, 100% to you, never
   stranded. `PayTo.status` says which (`none` / `unregistered` / `invalid`).
+- **A payout USDC refuses** (the USDC contract itself, or an address USDC has
+  blacklisted) → `payTo` = your wallet, status `blocked`. A split always pays every
+  recipient at once, so one such recipient would leave the whole payment stuck in
+  it. Checked when the code is resolved; a payout blacklisted after that is only
+  picked up when the process restarts or the cache is cleared.
 - **A code shown on base.dev is not always minted on-chain.** Only a minted code
   resolves. Check with `cast call 0x000000BC7E6457e610fe52Dcc0ca5b3ce59C8E80
   'isRegistered(string)(bool)' bc_yourcode`; `false` means it earns nothing until
