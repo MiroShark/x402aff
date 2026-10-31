@@ -8,8 +8,13 @@ on:
 # fork-test/ is deliberately not run here: it forks Base mainnet and needs an RPC
 # secret. Run `forge test` locally with X402_BASE_RPC set.
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   python:
+    timeout-minutes: 15
     runs-on: ${{ github.repository_owner == 'MiroShark' && 'blacksmith-2vcpu-ubuntu-2404' || 'ubuntu-latest' }}
     strategy:
       matrix:
@@ -25,6 +30,7 @@ jobs:
         working-directory: python
 
   typescript:
+    timeout-minutes: 15
     runs-on: ${{ github.repository_owner == 'MiroShark' && 'blacksmith-2vcpu-ubuntu-2404' || 'ubuntu-latest' }}
     strategy:
       matrix:
@@ -48,6 +54,7 @@ jobs:
         working-directory: ts
 
   package:
+    timeout-minutes: 15
     runs-on: ${{ github.repository_owner == 'MiroShark' && 'blacksmith-2vcpu-ubuntu-2404' || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v7
