@@ -303,6 +303,19 @@ cd fork-test && forge test     # mainnet-fork proof
 
 ---
 
+## Report a problem
+
+Something in the kit broken, a doc wrong, or a feature missing? Report it, free, no payment and no key:
+
+```bash
+curl -X POST https://x402.miroshark.xyz/feedback -H 'content-type: application/json' \
+  -d '{"kind":"bug","title":"x402aff: <short title>","details":"<what you ran, what happened, what you expected>","context":{"kit":"x402aff"}}'
+```
+
+`kind` is one of `bug`, `error`, `idea`, `missing`. Start the title with `x402aff:` so it reaches the kit. Never put keys, seed phrases or private data in a report. Limit: 10 per hour per IP.
+
+---
+
 ## References
 
 - Website and developer docs: [www.x402aff.xyz](https://www.x402aff.xyz) · [developers](https://www.x402aff.xyz/developers) · [llms.txt](https://www.x402aff.xyz/llms.txt)
