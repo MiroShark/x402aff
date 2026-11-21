@@ -1,3 +1,5 @@
+# One grouped PR per ecosystem per week (majors included), so CI runs once per
+# ecosystem instead of once per bump. Security updates still open on their own.
 version: 2
 updates:
   - package-ecosystem: pip
@@ -6,10 +8,9 @@ updates:
       interval: weekly
     open-pull-requests-limit: 5
     groups:
-      pip-minor-patch:
-        update-types:
-          - minor
-          - patch
+      pip-weekly:
+        patterns:
+          - "*"
   - package-ecosystem: npm
     directory: /ts
     schedule:
@@ -21,17 +22,15 @@ updates:
         update-types:
           - version-update:semver-major
     groups:
-      npm-minor-patch:
-        update-types:
-          - minor
-          - patch
+      npm-weekly:
+        patterns:
+          - "*"
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
     groups:
-      actions-minor-patch:
-        update-types:
-          - minor
-          - patch
+      actions-weekly:
+        patterns:
+          - "*"

@@ -7,6 +7,9 @@ on:
 
 # fork-test/ is deliberately not run here: it forks Base mainnet and needs an RPC
 # secret. Run `forge test` locally with X402_BASE_RPC set.
+#
+# GitHub runners, not Blacksmith: the repo is public (free minutes) and every
+# job is under 30 s, so Blacksmith's queue wait was the biggest part of each.
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -15,7 +18,7 @@ concurrency:
 jobs:
   python:
     timeout-minutes: 15
-    runs-on: ${{ github.repository_owner == 'MiroShark' && 'blacksmith-2vcpu-ubuntu-2404' || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: ["3.9", "3.13"]
@@ -31,7 +34,7 @@ jobs:
 
   typescript:
     timeout-minutes: 15
-    runs-on: ${{ github.repository_owner == 'MiroShark' && 'blacksmith-2vcpu-ubuntu-2404' || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         # `node --test` runs the .ts tests directly, which needs the unflagged
@@ -55,7 +58,7 @@ jobs:
 
   package:
     timeout-minutes: 15
-    runs-on: ${{ github.repository_owner == 'MiroShark' && 'blacksmith-2vcpu-ubuntu-2404' || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0

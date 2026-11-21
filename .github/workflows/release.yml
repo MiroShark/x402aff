@@ -36,7 +36,7 @@ jobs:
   # build + registry-metadata validation.
   test:
     timeout-minutes: 30
-    runs-on: ${{ github.repository_owner == 'MiroShark' && 'blacksmith-2vcpu-ubuntu-2404' || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
