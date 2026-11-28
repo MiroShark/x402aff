@@ -9,12 +9,12 @@ name: Release
 #
 #   PyPI  - OIDC trusted publishing, no token. Configured on
 #           https://pypi.org/manage/account/publishing/ with a publisher for
-#           project `x402aff`, owner `MiroShark`, repo `x402aff`, workflow
+#           project `x402aff`, owner `aeonfun`, repo `x402aff`, workflow
 #           `release.yml`, environment `pypi`. The `owner`/`repo` there are GitHub
 #           coordinates, unrelated to who owns the project on PyPI. `id-token:
 #           write` + the `pypi` environment on this job cover the OIDC exchange.
 #   npm   - OIDC trusted publishing, no token. Configured on npmjs.com (package
-#           Settings -> Trusted Publisher) for owner `MiroShark`, repo `x402aff`,
+#           Settings -> Trusted Publisher) for owner `aeonfun`, repo `x402aff`,
 #           workflow `release.yml` (must match this file's name), environment
 #           blank. Provenance is on via publishConfig + `id-token: write`.
 

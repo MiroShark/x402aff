@@ -1,25 +1,25 @@
 <p align="center">
-  <a href="https://www.x402aff.xyz"><img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/banner.png" alt="x402aff - Split every payment. Builder-code affiliation for x402: give the apps that send you paying users a cut, enforced on-chain at settlement. One line on the client, no facilitator of your own to run. 10% default builder cut, 1 line on the buyer's client, 0 contracts to run, 7 mainnet fork tests." width="100%" /></a>
+  <a href="https://www.x402aff.xyz"><img src="https://raw.githubusercontent.com/aeonfun/x402aff/main/docs/images/banner.png" alt="x402aff - Split every payment. Builder-code affiliation for x402: give the apps that send you paying users a cut, enforced on-chain at settlement. One line on the client, no facilitator of your own to run. 10% default builder cut, 1 line on the buyer's client, 0 contracts to run, 7 mainnet fork tests." width="100%" /></a>
 </p>
 
 <p align="center">
   <strong>Get it&nbsp;→</strong>&nbsp;&nbsp;
-  <a href="https://github.com/MiroShark/x402aff/stargazers"><img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/btn-star.svg" alt="Star x402aff on GitHub" height="34" align="absmiddle"></a>&nbsp;&nbsp;
-  <a href="https://pypi.org/project/x402aff/"><img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/btn-pypi.svg" alt="x402aff on PyPI" height="34" align="absmiddle"></a>&nbsp;&nbsp;
-  <a href="https://www.npmjs.com/package/x402aff"><img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/btn-npm.svg" alt="x402aff on npm" height="34" align="absmiddle"></a>&nbsp;&nbsp;
-  <a href="https://www.miroshark.xyz/x402aff"><img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/btn-dashboard.svg" alt="Live claims dashboard at miroshark.xyz/x402aff" height="34" align="absmiddle"></a>&nbsp;&nbsp;
-  <a href="./docs/INTEGRATION.md"><img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/btn-docs.svg" alt="Integration docs" height="34" align="absmiddle"></a>
+  <a href="https://github.com/aeonfun/x402aff/stargazers"><img src="https://raw.githubusercontent.com/aeonfun/x402aff/main/docs/images/btn-star.svg" alt="Star x402aff on GitHub" height="34" align="absmiddle"></a>&nbsp;&nbsp;
+  <a href="https://pypi.org/project/x402aff/"><img src="https://raw.githubusercontent.com/aeonfun/x402aff/main/docs/images/btn-pypi.svg" alt="x402aff on PyPI" height="34" align="absmiddle"></a>&nbsp;&nbsp;
+  <a href="https://www.npmjs.com/package/x402aff"><img src="https://raw.githubusercontent.com/aeonfun/x402aff/main/docs/images/btn-npm.svg" alt="x402aff on npm" height="34" align="absmiddle"></a>&nbsp;&nbsp;
+  <a href="https://www.miroshark.xyz/x402aff"><img src="https://raw.githubusercontent.com/aeonfun/x402aff/main/docs/images/btn-dashboard.svg" alt="Live claims dashboard at miroshark.xyz/x402aff" height="34" align="absmiddle"></a>&nbsp;&nbsp;
+  <a href="./docs/INTEGRATION.md"><img src="https://raw.githubusercontent.com/aeonfun/x402aff/main/docs/images/btn-docs.svg" alt="Integration docs" height="34" align="absmiddle"></a>
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/proof.webp" alt="The kit in four numbers: 10% default builder cut (1000 bps, set anywhere from 0 to 10000), 1 line on the buyer's client, 0 contracts to run, 7 mainnet-fork tests (5 of them adversarial)." width="100%" />
+  <img src="https://raw.githubusercontent.com/aeonfun/x402aff/main/docs/images/proof.webp" alt="The kit in four numbers: 10% default builder cut (1000 bps, set anywhere from 0 to 10000), 1 line on the buyer's client, 0 contracts to run, 7 mainnet-fork tests (5 of them adversarial)." width="100%" />
 </p>
 
 <div align="center">
 
 [![PyPI](https://img.shields.io/pypi/v/x402aff?logo=pypi&logoColor=white&label=pypi)](https://pypi.org/project/x402aff/)
 [![npm](https://img.shields.io/npm/v/x402aff?logo=npm&logoColor=white&label=npm)](https://www.npmjs.com/package/x402aff)
-[![CI](https://github.com/MiroShark/x402aff/actions/workflows/ci.yml/badge.svg)](https://github.com/MiroShark/x402aff/actions/workflows/ci.yml)
+[![CI](https://github.com/aeonfun/x402aff/actions/workflows/ci.yml/badge.svg)](https://github.com/aeonfun/x402aff/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 [![Dashboard](https://img.shields.io/badge/dashboard-miroshark.xyz%2Fx402aff-blue)](https://www.miroshark.xyz/x402aff)
 
@@ -36,7 +36,7 @@ settlement, so once it's there **nobody - including you - can redirect it**. Tha
 what makes it a credible offer rather than a promise.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/problem.webp" alt="Off-chain affiliate promises vs. an on-chain split. Before: you track referrals in a database, pay out monthly, and can change the rate or pause payouts; builders cannot verify a thing. After, with x402aff: the payment lands in an ownerless 0xSplits contract, split at settlement in the same USDC transfer, recipients and ratio baked into the address, and anyone can trigger the payout." width="100%" />
+  <img src="https://raw.githubusercontent.com/aeonfun/x402aff/main/docs/images/problem.webp" alt="Off-chain affiliate promises vs. an on-chain split. Before: you track referrals in a database, pay out monthly, and can change the rate or pause payouts; builders cannot verify a thing. After, with x402aff: the payment lands in an ownerless 0xSplits contract, split at settlement in the same USDC transfer, recipients and ratio baked into the address, and anyone can trigger the payout." width="100%" />
 </p>
 
 No settler, no self-run facilitator, no contract you write or audit: the stock CDP
@@ -52,7 +52,7 @@ builder adds *one line* to their x402 client.
 ## How it works
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/how.webp" alt="How payment works: 01 Request, the buyer's app calls your route with its builder code. 02 402, your API answers with payTo set to the (you, builder) split address. 03 Settle, the CDP facilitator settles the gasless USDC payment into the split and writes a/s/w on-chain. 04 Payout, anyone calls distribute: 10% to the builder, 90% to you." width="100%" />
+  <img src="https://raw.githubusercontent.com/aeonfun/x402aff/main/docs/images/how.webp" alt="How payment works: 01 Request, the buyer's app calls your route with its builder code. 02 402, your API answers with payTo set to the (you, builder) split address. 03 Settle, the CDP facilitator settles the gasless USDC payment into the split and writes a/s/w on-chain. 04 Payout, anyone calls distribute: 10% to the builder, 90% to you." width="100%" />
 </p>
 
 Base [Builder Codes](https://docs.cdp.coinbase.com/x402/core-concepts/builder-codes)
@@ -136,7 +136,7 @@ official `@x402/extensions/builder-code`. Stamping `s` by hand instead?
 ## Options
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/features.webp" alt="Everything a seller needs, nothing to operate: change the cut, more than two recipients, release payouts, claims dashboard, find every kit payment, any language." width="100%" />
+  <img src="https://raw.githubusercontent.com/aeonfun/x402aff/main/docs/images/features.webp" alt="Everything a seller needs, nothing to operate: change the cut, more than two recipients, release payouts, claims dashboard, find every kit payment, any language." width="100%" />
 </p>
 
 **Change the cut.** Basis points, default `1000` (10%), range `0..10000` (`0` =
@@ -246,7 +246,7 @@ Full trust model, edge cases, and caveats: [`INTEGRATION.md`](./docs/INTEGRATION
 ## Security
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/security.webp" alt="Money in a split can only reach two addresses. Attacks on a funded split and their results: trigger distribute as distributor (pays out, you get 0), tampered struct (reverts), hijacking split at the funded address (impossible), updateSplit or setPaused (reverts, ownerless), front-run the deploy (still pays builder and seller)." width="100%" />
+  <img src="https://raw.githubusercontent.com/aeonfun/x402aff/main/docs/images/security.webp" alt="Money in a split can only reach two addresses. Attacks on a funded split and their results: trigger distribute as distributor (pays out, you get 0), tampered struct (reverts), hijacking split at the funded address (impossible), updateSplit or setPaused (reverts, ownerless), front-run the deploy (still pays builder and seller)." width="100%" />
 </p>
 
 **The kit deploys no contracts of its own.** It only *reads* two canonical
@@ -319,7 +319,7 @@ curl -X POST https://x402.miroshark.xyz/feedback -H 'content-type: application/j
 ## References
 
 - Website and developer docs: [www.x402aff.xyz](https://www.x402aff.xyz) · [developers](https://www.x402aff.xyz/developers) · [llms.txt](https://www.x402aff.xyz/llms.txt)
-- Agent skill: [`skills/x402aff/SKILL.md`](./skills/x402aff/SKILL.md), install it into your coding agent with `npx skills add MiroShark/x402aff`
+- Agent skill: [`skills/x402aff/SKILL.md`](./skills/x402aff/SKILL.md), install it into your coding agent with `npx skills add aeonfun/x402aff`
 - [ERC-8021 builder-code spec](https://github.com/x402-foundation/x402/blob/main/specs/extensions/builder_code.md) · [CDP Builder Codes](https://docs.cdp.coinbase.com/x402/core-concepts/builder-codes)
 - [Base Builder Codes](https://docs.base.org/apps/builder-codes/builder-codes) · registry [`github.com/base/builder-codes`](https://github.com/base/builder-codes)
 - [0xSplits PushSplit V2](https://splits.org/protocol/docs/core/split-v2) · factory `0x8E8eB0cC6AE34A38B67D5Cf91ACa38f60bc3Ecf4`
@@ -327,7 +327,7 @@ curl -X POST https://x402.miroshark.xyz/feedback -H 'content-type: application/j
 ---
 
 <p align="center">
-  <a href="https://www.x402aff.xyz"><img src="https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/images/jackpot.webp" alt="A clay arcade cabinet spilling lime coins" width="360" /></a>
+  <a href="https://www.x402aff.xyz"><img src="https://raw.githubusercontent.com/aeonfun/x402aff/main/docs/images/jackpot.webp" alt="A clay arcade cabinet spilling lime coins" width="360" /></a>
 </p>
 
 <h3 align="center">Give builders a reason to send you buyers.</h3>

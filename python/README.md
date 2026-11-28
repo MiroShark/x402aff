@@ -2,7 +2,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/x402aff?logo=pypi&logoColor=white&label=pypi)](https://pypi.org/project/x402aff/)
 [![Python versions](https://img.shields.io/pypi/pyversions/x402aff)](https://pypi.org/project/x402aff/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](https://github.com/MiroShark/x402aff/blob/main/LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](https://github.com/aeonfun/x402aff/blob/main/LICENSE)
 
 The x402aff kit (Python): an installable `x402aff` package with the one-object
 [`Affiliation`](./x402aff/affiliation.py) facade on top. This is the
@@ -20,7 +20,7 @@ Or from a checkout / straight from git, to track unreleased changes:
 ```bash
 pip install ./python                 # from a clone, at the repo root
 pip install '.[cdp]'                 # from inside python/, with the CDP extra
-pip install 'x402aff[cdp] @ git+https://github.com/MiroShark/x402aff@main#subdirectory=python'
+pip install 'x402aff[cdp] @ git+https://github.com/aeonfun/x402aff@main#subdirectory=python'
 ```
 
 The `cdp` extra adds `cdp-sdk`, needed only for the CDP-index discovery path

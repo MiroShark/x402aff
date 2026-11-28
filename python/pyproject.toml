@@ -49,9 +49,9 @@ dev = ["pytest>=7.0"]
 
 [project.urls]
 Homepage = "https://www.x402aff.xyz"
-Repository = "https://github.com/MiroShark/x402aff"
+Repository = "https://github.com/aeonfun/x402aff"
 Documentation = "https://www.x402aff.xyz/developers"
-Issues = "https://github.com/MiroShark/x402aff/issues"
+Issues = "https://github.com/aeonfun/x402aff/issues"
 
 [tool.setuptools]
 packages = ["x402aff"]

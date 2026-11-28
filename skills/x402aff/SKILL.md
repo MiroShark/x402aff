@@ -104,7 +104,7 @@ curl -X POST https://x402.miroshark.xyz/feedback -H 'content-type: application/j
 ## References
 
 - Developer docs: https://www.x402aff.xyz/developers.md
-- Integration guide: https://raw.githubusercontent.com/MiroShark/x402aff/main/docs/INTEGRATION.md
-- TypeScript guide: https://raw.githubusercontent.com/MiroShark/x402aff/main/ts/README.md
-- Repository: https://github.com/MiroShark/x402aff
+- Integration guide: https://raw.githubusercontent.com/aeonfun/x402aff/main/docs/INTEGRATION.md
+- TypeScript guide: https://raw.githubusercontent.com/aeonfun/x402aff/main/ts/README.md
+- Repository: https://github.com/aeonfun/x402aff
 - Read-only MCP server with these docs as tools: https://www.x402aff.xyz/api/mcp
