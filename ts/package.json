@@ -37,11 +37,11 @@
   "homepage": "https://www.x402aff.xyz",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/MiroShark/x402aff.git",
+    "url": "git+https://github.com/aeonfun/x402aff.git",
     "directory": "ts"
   },
   "bugs": {
-    "url": "https://github.com/MiroShark/x402aff/issues"
+    "url": "https://github.com/aeonfun/x402aff/issues"
   },
   "publishConfig": {
     "access": "public",
